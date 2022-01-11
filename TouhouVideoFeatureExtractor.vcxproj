@@ -13,6 +13,7 @@
   <PropertyGroup Label="Globals">
     <ProjectGuid>{D169ACB5-862E-4812-8418-4EC69E4FCBE5}</ProjectGuid>
     <RootNamespace>TouhouVideoFeatureExtractor</RootNamespace>
+    <WindowsTargetPlatformVersion>10.0</WindowsTargetPlatformVersion>
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'" Label="Configuration">
@@ -64,6 +65,7 @@
       <FunctionLevelLinking>true</FunctionLevelLinking>
       <IntrinsicFunctions>true</IntrinsicFunctions>
       <PreprocessorDefinitions>WIN32;WIN64;NDEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <LanguageStandard>stdcpp17</LanguageStandard>
     </ClCompile>
     <Link>
       <GenerateDebugInformation>true</GenerateDebugInformation>
@@ -74,15 +76,24 @@
     </Link>
     <CudaCompile>
       <TargetMachinePlatform>64</TargetMachinePlatform>
+      <CodeGeneration>compute_75,sm_75;compute_86,sm_86</CodeGeneration>
+      <AdditionalOptions>-std=c++17 %(AdditionalOptions)</AdditionalOptions>
     </CudaCompile>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <CudaCompile Include="CLIP\clip.cu" />
+    <CudaCompile Include="TransNetV2\transnetv2.cu" />
     <CudaCompile Include="test_kernel.cu" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="main.cc" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="CLIP\clip.cuh" />
+    <ClInclude Include="common.h" />
+    <ClInclude Include="CUDAWrapper\CUDAStream.h" />
+    <ClInclude Include="wrappers\CUDAThreadContext.h" />
+    <ClInclude Include="TransNetV2\transnetv2.cuh" />
     <ClInclude Include="test_kernel.cuh" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
