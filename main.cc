@@ -5,10 +5,20 @@
 
 #include <stdio.h>
 
+#include "common.h"
+
+#include "wrappers/CUDAContext.h"
+
 #include "test_kernel.cuh"
+#include "VideoDecoder/NvCodecs/Logger.h"
+
+simplelogger::Logger* nvcodecs_logger = simplelogger::LoggerFactory::CreateConsoleLogger();
 
 int main()
 {
+    ck2(cuInit(0));
+    CUDAContext context(0, 0);
+
     const int arraySize = 5;
     const int a[arraySize] = { 1, 2, 3, 4, 5 };
     const int b[arraySize] = { 10, 20, 30, 40, 50 };

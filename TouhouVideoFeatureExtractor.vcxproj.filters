@@ -13,6 +13,8 @@
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="main.cc" />
+    <ClCompile Include="VideoDecoder\video_decoder.cc" />
+    <ClCompile Include="VideoDecoder\NvCodecs\NvDecoder.cpp" />
   </ItemGroup>
   <ItemGroup>
     <CudaCompile Include="test_kernel.cu">
@@ -22,6 +24,10 @@
       <Filter>CUDA</Filter>
     </CudaCompile>
     <CudaCompile Include="CLIP\clip.cu" />
+    <CudaCompile Include="VideoDecoder\NvCodecs\BitDepth.cu" />
+    <CudaCompile Include="VideoDecoder\NvCodecs\ColorSpace.cu" />
+    <CudaCompile Include="VideoDecoder\NvCodecs\crc.cu" />
+    <CudaCompile Include="VideoDecoder\NvCodecs\Resize.cu" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="test_kernel.cuh">
@@ -30,11 +36,19 @@
     <ClInclude Include="TransNetV2\transnetv2.cuh">
       <Filter>CUDA</Filter>
     </ClInclude>
-    <ClInclude Include="CUDAWrapper\CUDAStream.h">
-      <Filter>CUDA</Filter>
-    </ClInclude>
     <ClInclude Include="wrappers\CUDAThreadContext.h" />
     <ClInclude Include="common.h" />
     <ClInclude Include="CLIP\clip.cuh" />
+    <ClInclude Include="wrappers\CUDADeviceMemory.h" />
+    <ClInclude Include="wrappers\CUDAHostMemory.h" />
+    <ClInclude Include="wrappers\CUDAStream.h" />
+    <ClInclude Include="VideoDecoder\video_decoder.h" />
+    <ClInclude Include="VideoDecoder\NvCodecs\ColorSpace.h" />
+    <ClInclude Include="VideoDecoder\NvCodecs\FFmpegDemuxer.h" />
+    <ClInclude Include="VideoDecoder\NvCodecs\FFmpegStreamer.h" />
+    <ClInclude Include="VideoDecoder\NvCodecs\Logger.h" />
+    <ClInclude Include="VideoDecoder\NvCodecs\NvCodecUtils.h" />
+    <ClInclude Include="VideoDecoder\NvCodecs\NvDecoder.h" />
+    <ClInclude Include="wrappers\CUDAContext.h" />
   </ItemGroup>
 </Project>

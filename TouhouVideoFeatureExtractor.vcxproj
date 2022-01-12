@@ -43,6 +43,10 @@
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <LinkIncremental>true</LinkIncremental>
   </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
+    <IncludePath>C:\Users\unknown\source\repos\FFmpeg\include;$(IncludePath)</IncludePath>
+    <LibraryPath>C:\Users\unknown\source\repos\FFmpeg\lib\x64;$(LibraryPath)</LibraryPath>
+  </PropertyGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <ClCompile>
       <WarningLevel>Level3</WarningLevel>
@@ -72,7 +76,7 @@
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
       <OptimizeReferences>true</OptimizeReferences>
       <SubSystem>Console</SubSystem>
-      <AdditionalDependencies>cudart_static.lib;kernel32.lib;user32.lib;gdi32.lib;winspool.lib;comdlg32.lib;advapi32.lib;shell32.lib;ole32.lib;oleaut32.lib;uuid.lib;odbc32.lib;odbccp32.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>avcodec.lib;avformat.lib;avutil.lib;swresample.lib;nvcuvid.lib;cuda.lib;cudart_static.lib;kernel32.lib;user32.lib;gdi32.lib;winspool.lib;comdlg32.lib;advapi32.lib;shell32.lib;ole32.lib;oleaut32.lib;uuid.lib;odbc32.lib;odbccp32.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
     <CudaCompile>
       <TargetMachinePlatform>64</TargetMachinePlatform>
@@ -84,14 +88,30 @@
     <CudaCompile Include="CLIP\clip.cu" />
     <CudaCompile Include="TransNetV2\transnetv2.cu" />
     <CudaCompile Include="test_kernel.cu" />
+    <CudaCompile Include="VideoDecoder\NvCodecs\BitDepth.cu" />
+    <CudaCompile Include="VideoDecoder\NvCodecs\ColorSpace.cu" />
+    <CudaCompile Include="VideoDecoder\NvCodecs\crc.cu" />
+    <CudaCompile Include="VideoDecoder\NvCodecs\Resize.cu" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="main.cc" />
+    <ClCompile Include="VideoDecoder\NvCodecs\NvDecoder.cpp" />
+    <ClCompile Include="VideoDecoder\video_decoder.cc" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="CLIP\clip.cuh" />
     <ClInclude Include="common.h" />
-    <ClInclude Include="CUDAWrapper\CUDAStream.h" />
+    <ClInclude Include="VideoDecoder\NvCodecs\ColorSpace.h" />
+    <ClInclude Include="VideoDecoder\NvCodecs\FFmpegDemuxer.h" />
+    <ClInclude Include="VideoDecoder\NvCodecs\FFmpegStreamer.h" />
+    <ClInclude Include="VideoDecoder\NvCodecs\Logger.h" />
+    <ClInclude Include="VideoDecoder\NvCodecs\NvCodecUtils.h" />
+    <ClInclude Include="VideoDecoder\NvCodecs\NvDecoder.h" />
+    <ClInclude Include="VideoDecoder\video_decoder.h" />
+    <ClInclude Include="wrappers\CUDAContext.h" />
+    <ClInclude Include="wrappers\CUDADeviceMemory.h" />
+    <ClInclude Include="wrappers\CUDAHostMemory.h" />
+    <ClInclude Include="wrappers\CUDAStream.h" />
     <ClInclude Include="wrappers\CUDAThreadContext.h" />
     <ClInclude Include="TransNetV2\transnetv2.cuh" />
     <ClInclude Include="test_kernel.cuh" />
