@@ -17,7 +17,9 @@
 #include <chrono>
 #include <string_view>
 #include <iostream>
-
+#include <optional>
+#include <mutex>
+#include <queue>
 
 //#include <thrust/host_vector.h>
 
@@ -115,3 +117,10 @@ struct pair_hash
 		return h1;
 	}
 };
+
+using u8 = std::uint8_t;
+using u32 = std::uint32_t;
+using u64 = std::uint64_t;
+using usize = std::size_t;
+using f32 = float;
+using f64 = double;

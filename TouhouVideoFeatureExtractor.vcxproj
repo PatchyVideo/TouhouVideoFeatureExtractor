@@ -101,6 +101,7 @@
   <ItemGroup>
     <ClInclude Include="CLIP\clip.cuh" />
     <ClInclude Include="common.h" />
+    <ClInclude Include="stl_replacements\robin_hood.h" />
     <ClInclude Include="VideoDecoder\NvCodecs\ColorSpace.h" />
     <ClInclude Include="VideoDecoder\NvCodecs\FFmpegDemuxer.h" />
     <ClInclude Include="VideoDecoder\NvCodecs\FFmpegStreamer.h" />

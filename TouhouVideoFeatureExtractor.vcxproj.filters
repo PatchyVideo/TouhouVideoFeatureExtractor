@@ -50,5 +50,6 @@
     <ClInclude Include="VideoDecoder\NvCodecs\NvCodecUtils.h" />
     <ClInclude Include="VideoDecoder\NvCodecs\NvDecoder.h" />
     <ClInclude Include="wrappers\CUDAContext.h" />
+    <ClInclude Include="stl_replacements\robin_hood.h" />
   </ItemGroup>
 </Project>
