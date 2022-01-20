@@ -28,6 +28,7 @@
     <CudaCompile Include="VideoDecoder\NvCodecs\ColorSpace.cu" />
     <CudaCompile Include="VideoDecoder\NvCodecs\crc.cu" />
     <CudaCompile Include="VideoDecoder\NvCodecs\Resize.cu" />
+    <CudaCompile Include="VideoDecoder\nv12_to_rgb_resize.cu" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="test_kernel.cuh">
@@ -51,5 +52,6 @@
     <ClInclude Include="VideoDecoder\NvCodecs\NvDecoder.h" />
     <ClInclude Include="wrappers\CUDAContext.h" />
     <ClInclude Include="stl_replacements\robin_hood.h" />
+    <ClInclude Include="VideoDecoder\nv12_to_rgb_resize.cuh" />
   </ItemGroup>
 </Project>

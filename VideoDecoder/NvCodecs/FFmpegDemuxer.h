@@ -47,6 +47,8 @@ private:
 
     unsigned int frameCount = 0;
 
+    std::int64_t nFrames;
+    double fVideoFPS;
 public:
     class DataProvider {
     public:
@@ -63,7 +65,7 @@ private:
     FFmpegDemuxer(AVFormatContext *fmtc, int64_t timeScale = 1000 /*Hz*/) : fmtc(fmtc) {
         if (!fmtc) {
             LOG(ERROR) << "No AVFormatContext provided.";
-            return;
+            throw std::exception();
         }
 
         LOG(INFO) << "Media format: " << fmtc->iformat->long_name << " (" << fmtc->iformat->name << ")";
@@ -72,13 +74,15 @@ private:
         iVideoStream = av_find_best_stream(fmtc, AVMEDIA_TYPE_VIDEO, -1, -1, NULL, 0);
         if (iVideoStream < 0) {
             LOG(ERROR) << "FFmpeg error: " << __FILE__ << " " << __LINE__ << " " << "Could not find stream in input file";
-            return;
+            throw std::exception();
         }
 
         //fmtc->streams[iVideoStream]->need_parsing = AVSTREAM_PARSE_NONE;
         eVideoCodec = fmtc->streams[iVideoStream]->codecpar->codec_id;
         nWidth = fmtc->streams[iVideoStream]->codecpar->width;
         nHeight = fmtc->streams[iVideoStream]->codecpar->height;
+        nFrames = fmtc->streams[iVideoStream]->nb_frames;
+        fVideoFPS = av_q2d(fmtc->streams[iVideoStream]->r_frame_rate);
         eChromaFormat = (AVPixelFormat)fmtc->streams[iVideoStream]->codecpar->format;
         AVRational rTimeBase = fmtc->streams[iVideoStream]->time_base;
         timeBase = av_q2d(rTimeBase);
@@ -267,6 +271,9 @@ public:
     int GetFrameSize() {
         return nWidth * (nHeight + nChromaHeight) * nBPP;
     }
+    std::int64_t GetDuration() const { return fmtc->duration; }
+    std::int64_t GetFrameCount() const { return nFrames; }
+    double GetFPS() const { return fVideoFPS; }
     bool Demux(uint8_t **ppVideo, int *pnVideoBytes, int64_t *pts = NULL) {
         if (!fmtc) {
             return false;

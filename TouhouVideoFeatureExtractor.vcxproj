@@ -42,6 +42,8 @@
   <PropertyGroup Label="UserMacros" />
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <LinkIncremental>true</LinkIncremental>
+    <IncludePath>C:\Users\unknown\source\repos\FFmpeg\include;$(VC_IncludePath);$(WindowsSDK_IncludePath);</IncludePath>
+    <LibraryPath>C:\Users\unknown\source\repos\FFmpeg\lib\x64;$(VC_LibraryPath_x64);$(WindowsSDK_LibraryPath_x64)</LibraryPath>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <IncludePath>C:\Users\unknown\source\repos\FFmpeg\include;$(IncludePath)</IncludePath>
@@ -52,14 +54,16 @@
       <WarningLevel>Level3</WarningLevel>
       <Optimization>Disabled</Optimization>
       <PreprocessorDefinitions>WIN32;WIN64;_DEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <LanguageStandard>stdcpp17</LanguageStandard>
     </ClCompile>
     <Link>
       <GenerateDebugInformation>true</GenerateDebugInformation>
       <SubSystem>Console</SubSystem>
-      <AdditionalDependencies>cudart_static.lib;kernel32.lib;user32.lib;gdi32.lib;winspool.lib;comdlg32.lib;advapi32.lib;shell32.lib;ole32.lib;oleaut32.lib;uuid.lib;odbc32.lib;odbccp32.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>avcodec.lib;avformat.lib;avutil.lib;swresample.lib;nvcuvid.lib;cuda.lib;cudart_static.lib;kernel32.lib;user32.lib;gdi32.lib;winspool.lib;comdlg32.lib;advapi32.lib;shell32.lib;ole32.lib;oleaut32.lib;uuid.lib;odbc32.lib;odbccp32.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
     <CudaCompile>
       <TargetMachinePlatform>64</TargetMachinePlatform>
+      <AdditionalOptions>-std=c++17 --expt-relaxed-constexpr %(AdditionalOptions)</AdditionalOptions>
     </CudaCompile>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
@@ -81,13 +85,14 @@
     <CudaCompile>
       <TargetMachinePlatform>64</TargetMachinePlatform>
       <CodeGeneration>compute_75,sm_75;compute_86,sm_86</CodeGeneration>
-      <AdditionalOptions>-std=c++17 %(AdditionalOptions)</AdditionalOptions>
+      <AdditionalOptions>-std=c++17 --expt-relaxed-constexpr %(AdditionalOptions)</AdditionalOptions>
     </CudaCompile>
   </ItemDefinitionGroup>
   <ItemGroup>
     <CudaCompile Include="CLIP\clip.cu" />
     <CudaCompile Include="TransNetV2\transnetv2.cu" />
     <CudaCompile Include="test_kernel.cu" />
+    <CudaCompile Include="VideoDecoder\nv12_to_rgb_resize.cu" />
     <CudaCompile Include="VideoDecoder\NvCodecs\BitDepth.cu" />
     <CudaCompile Include="VideoDecoder\NvCodecs\ColorSpace.cu" />
     <CudaCompile Include="VideoDecoder\NvCodecs\crc.cu" />
@@ -102,6 +107,7 @@
     <ClInclude Include="CLIP\clip.cuh" />
     <ClInclude Include="common.h" />
     <ClInclude Include="stl_replacements\robin_hood.h" />
+    <ClInclude Include="VideoDecoder\nv12_to_rgb_resize.cuh" />
     <ClInclude Include="VideoDecoder\NvCodecs\ColorSpace.h" />
     <ClInclude Include="VideoDecoder\NvCodecs\FFmpegDemuxer.h" />
     <ClInclude Include="VideoDecoder\NvCodecs\FFmpegStreamer.h" />

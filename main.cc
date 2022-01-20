@@ -1,4 +1,5 @@
 
+#include <iostream>
 
 #include "cuda_runtime.h"
 #include "device_launch_parameters.h"
@@ -12,6 +13,9 @@
 #include "test_kernel.cuh"
 #include "VideoDecoder/NvCodecs/Logger.h"
 
+#include "VideoDecoder/video_decoder.h"
+#include "stl_replacements/robin_hood.h"
+
 simplelogger::Logger* nvcodecs_logger = simplelogger::LoggerFactory::CreateConsoleLogger();
 
 int main()
@@ -19,28 +23,45 @@ int main()
     ck2(cuInit(0));
     CUDAContext context(0, 0);
 
-    const int arraySize = 5;
-    const int a[arraySize] = { 1, 2, 3, 4, 5 };
-    const int b[arraySize] = { 10, 20, 30, 40, 50 };
-    int c[arraySize] = { 0 };
+    VideoDecoder decoder(context, 3, 100, 384, 384);
+    decoder.EnqueueDecode("..\\test_videos\\1.flv", 123);
 
-    // Add vectors in parallel.
-    cudaError_t cudaStatus = addWithCuda(c, a, b, arraySize);
-    if (cudaStatus != cudaSuccess) {
-        fprintf(stderr, "addWithCuda failed!");
-        return 1;
+    robin_hood::unordered_flat_map<usize, BasicVideoInformation> video_infos;
+
+    usize num_frames(0);
+    for (;;) {
+        auto info_opt(decoder.GetVideoInformation());
+        if (info_opt.has_value()) {
+            auto const& info(*info_opt);
+            std::cout << "====Video Info====\n";
+            std::cout << "Video ID: " << info.video_id << "\n";
+            std::cout << "Width: " << info.width << "\n";
+            std::cout << "Height: " << info.height << "\n";
+            std::cout << "FPS: " << info.frame_per_second << "\n";
+            std::cout << "Frame count: " << info.frame_count << "\n";
+            std::cout << "Duration: " << info.duration_us << "\n";
+            std::cout << "==================\n";
+        }
+        auto frame_batch_opt(decoder.PollNextBatch());
+        if (frame_batch_opt.has_value()) {
+            auto& frame_batch(*frame_batch_opt);
+            std::cout << "====Frame Batch====\n";
+            std::cout << "Offset: " << frame_batch.frame_offset << "\n";
+            std::cout << "#Frame: " << frame_batch.number_of_frames << "\n";
+            std::cout << "EOS: " << frame_batch.end_of_video << "\n";
+            std::cout << "m_memory_block_id: " << frame_batch.m_memory_block_id << "\n";
+            std::cout << "===================\n";
+            num_frames += frame_batch.number_of_frames;
+            using namespace std::chrono_literals;
+            std::this_thread::sleep_for(100ms);
+            frame_batch.ConsumeBatch();
+            if (frame_batch.end_of_video)
+                break;
+        }
     }
-
-    printf("{1,2,3,4,5} + {10,20,30,40,50} = {%d,%d,%d,%d,%d}\n",
-        c[0], c[1], c[2], c[3], c[4]);
-
-    // cudaDeviceReset must be called before exiting in order for profiling and
-    // tracing tools such as Nsight and Visual Profiler to show complete traces.
-    cudaStatus = cudaDeviceReset();
-    if (cudaStatus != cudaSuccess) {
-        fprintf(stderr, "cudaDeviceReset failed!");
-        return 1;
-    }
+    decoder.Stop();
+    std::cout << "End\n";
+    std::cout << "frames decoded: " << num_frames << "\n";
 
     return 0;
 }

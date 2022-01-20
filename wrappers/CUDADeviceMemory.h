@@ -41,9 +41,9 @@ struct CUDADeviceMemoryUnique
 		*this = std::move(CUDADeviceMemoryUnique<T>(n));
 	}
 
-	CUdeviceptr at_offset(std::size_t element_size, std::size_t n) const
+	T* at_offset(std::size_t element_size, std::size_t n) const
 	{
-		return ptr + element_size * n * sizeof(T);
+		return reinterpret_cast<T*>(ptr + element_size * n * sizeof(T));
 	}
 
 	void download(CUDAHostMemoryUnique<T>& output, CUstream stream) const
