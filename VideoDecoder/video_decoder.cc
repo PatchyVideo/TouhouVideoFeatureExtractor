@@ -3,6 +3,7 @@
 #include "NvCodecs/FFmpegDemuxer.h"
 #include "NvCodecs/NvDecoder.h"
 #include "../wrappers/CUDAStream.h"
+#include "nv12_to_rgb_resize.cuh"
 
 #undef max
 #undef min
@@ -55,12 +56,22 @@ struct NV12Buffer {
 		return { num_frames - frames_to_copy, frames_to_copy, count >= capacity };
 	}
 
-	void ProcessNV12(CUdeviceptr out_rgb, usize block_id, usize slot_id) {
+	void ProcessNV12(CUdeviceptr out_rgb, usize block_id, usize slot_id, i32 width, i32 height, i32 out_width, i32 out_height) {
 		assert(count > 0 && !processing);
 		this->block_id = block_id;
 		this->slot_id = slot_id;
 		processing = true;
-		// TODO: convert to RGB and resize
+		nv12_to_rgb_resize(
+			reinterpret_cast<u8*>(out_rgb),
+			reinterpret_cast<u8 const* const>(data.ptr),
+			count,
+			element_size,
+			width,
+			height,
+			out_width,
+			out_height,
+			stream
+		);
 	}
 
 	void Clear() {
@@ -207,6 +218,7 @@ void video_deocder_thread(CUcontext cuda_context, VideoDecoderSyncState *states)
 			nFrameReturned = dec.Decode(pVideo, nVideoBytes);
 			if (nFrameReturned > max_frames_returned)
 			{
+				std::cout << "max_frames_returned:" << nFrameReturned << "\n";
 				if (ppFrame)
 					ppFrame = static_cast<u8**>(realloc(ppFrame, nFrameReturned * sizeof(u8*)));
 				else
@@ -221,8 +233,10 @@ void video_deocder_thread(CUcontext cuda_context, VideoDecoderSyncState *states)
 			while (nFrameReturned > 0 && states->running) {
 				if (!inited) {
 					inited = true;
+					if (dec.GetOutputFormat() != cudaVideoSurfaceFormat::cudaVideoSurfaceFormat_NV12)
+						throw std::runtime_error("Only NV12 format is supported now!");
 					for (usize i(0); i != NUM_NV12_BUFFERS; ++i) {
-						decoded_frames_buffer[i].Init(states->frames_per_buffer / NUM_NV12_BUFFER_SLOT_PER_BUFFER, dec.GetFrameSize());
+						decoded_frames_buffer[i].Init(frames_per_slot, dec.GetFrameSize());
 					}
 				}
 				if (decoded_frames_buffer[scheduled_nv12_buffer_idx].Sync()) {
@@ -235,19 +249,20 @@ void video_deocder_thread(CUcontext cuda_context, VideoDecoderSyncState *states)
 				nFrameReturned -= copied_frames;
 				if (full) {
 					auto [ptr, memory_block_id, slot_id] = find_next_memory_block_slot();
-					decoded_frames_buffer[scheduled_nv12_buffer_idx].ProcessNV12(ptr, memory_block_id, slot_id);
+					decoded_frames_buffer[scheduled_nv12_buffer_idx].ProcessNV12(ptr, memory_block_id, slot_id, demuxer.GetWidth(), demuxer.GetHeight(), states->output_width, states->output_height);
 					scheduled_nv12_buffer_idx = (scheduled_nv12_buffer_idx + 1) % NUM_NV12_BUFFERS;
 				}
 				decoded_frame += copied_frames;
 			}
 		}
+		// in case no extra buffers when notify_end_of_stream is called
 		usize remainder(decoded_frame % states->frames_per_buffer);
 		if (decoded_frame % states->frames_per_buffer == 0 || remainder > states->frames_per_buffer - frames_per_slot)
 			end_of_video = true;
 		// process remaining frames if any
 		if (decoded_frames_buffer[scheduled_nv12_buffer_idx].count && !decoded_frames_buffer[scheduled_nv12_buffer_idx].processing) {
 			auto [ptr, memory_block_id, slot_id] = find_next_memory_block_slot();
-			decoded_frames_buffer[scheduled_nv12_buffer_idx].ProcessNV12(ptr, memory_block_id, slot_id);
+			decoded_frames_buffer[scheduled_nv12_buffer_idx].ProcessNV12(ptr, memory_block_id, slot_id, demuxer.GetWidth(), demuxer.GetHeight(), states->output_width, states->output_height);
 			scheduled_nv12_buffer_idx = (scheduled_nv12_buffer_idx + 1) % NUM_NV12_BUFFERS;
 		}
 

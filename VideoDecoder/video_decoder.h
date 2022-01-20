@@ -16,6 +16,7 @@ namespace video_deocder_impl {
 	);
 
 	constexpr usize VIDEO_DECODER_DEFAULT_QUEUE_SIZE = 20;
+	constexpr usize VIDEO_DECODER_DEFAULT_THREAD_COUNT = 1; // <-- set to 5 for NVIDIA A100, set to 4 for NVIDIA A30, see https://developer.nvidia.com/video-encode-and-decode-gpu-support-matrix-new#Decoder
 }
 
 struct BasicVideoInformation {
@@ -74,9 +75,11 @@ struct FrameBatch {
 struct VideoDecoderSyncState {
 	VideoDecoderSyncState(usize num_buffers, usize frames_per_buffer, u32 resize_width, u32 resize_height) {
 		running = true;
+		output_width = resize_width;
+		output_height = resize_height;
 		this->num_buffers = num_buffers;
 		this->frames_per_buffer = frames_per_buffer;
-		frame_stride = 3 * resize_width * resize_height;
+		frame_stride = 3 * static_cast<usize>(resize_width) * static_cast<usize>(resize_height);
 		memory_block_stride = frames_per_buffer * frame_stride;
 		frames.reallocate(memory_block_stride * num_buffers);
 		memory_block_states.reserve(num_buffers);
@@ -203,6 +206,9 @@ struct VideoDecoderSyncState {
 	usize memory_block_stride;
 	usize frame_stride;
 	usize frames_per_buffer;
+
+	u32 output_width;
+	u32 output_height;
 private:
 	std::queue<std::tuple<std::string, usize>> file_queue;
 	std::mutex file_queue_mutex;
@@ -224,7 +230,8 @@ struct VideoDecoder {
 		m_cuda_context(cuda_context),
 		m_sync_states(num_buffers, frames_per_buffer, resize_width, resize_height)
 	{
-		m_thread = std::thread(video_deocder_impl::video_deocder_thread, cuda_context, &m_sync_states);
+		for (usize i(0); i != video_deocder_impl::VIDEO_DECODER_DEFAULT_THREAD_COUNT; ++i)
+			m_thread[i] = std::thread(video_deocder_impl::video_deocder_thread, cuda_context, &m_sync_states);
 	}
 
 	VideoDecoder(VideoDecoder const& a) = delete;
@@ -295,12 +302,13 @@ struct VideoDecoder {
 	void Stop() {
 		if (m_sync_states.running) {
 			m_sync_states.running = false;
-			m_thread.join();
+			for (usize i(0); i != video_deocder_impl::VIDEO_DECODER_DEFAULT_THREAD_COUNT; ++i)
+				m_thread[i].join();
 		}
 	}
 
 private:
 	CUcontext m_cuda_context;
 	VideoDecoderSyncState m_sync_states;
-	std::thread m_thread;
+	std::thread m_thread[video_deocder_impl::VIDEO_DECODER_DEFAULT_THREAD_COUNT];
 };

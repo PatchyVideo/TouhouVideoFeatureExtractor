@@ -15,6 +15,7 @@
     <ClCompile Include="main.cc" />
     <ClCompile Include="VideoDecoder\video_decoder.cc" />
     <ClCompile Include="VideoDecoder\NvCodecs\NvDecoder.cpp" />
+    <ClCompile Include="Utils\lodepng.cpp" />
   </ItemGroup>
   <ItemGroup>
     <CudaCompile Include="test_kernel.cu">
@@ -54,5 +55,6 @@
     <ClInclude Include="stl_replacements\robin_hood.h" />
     <ClInclude Include="VideoDecoder\nv12_to_rgb_resize.cuh" />
     <ClInclude Include="Utils\FPSCounter.h" />
+    <ClInclude Include="Utils\lodepng.h" />
   </ItemGroup>
 </Project>
