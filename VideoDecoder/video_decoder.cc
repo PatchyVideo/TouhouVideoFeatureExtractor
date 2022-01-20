@@ -80,14 +80,16 @@ struct NV12Buffer {
 void video_deocder_thread(CUcontext cuda_context, VideoDecoderSyncState *states) {
 	CUDAThreadContext cuda_thread_ctx(cuda_context);
 
-	constexpr usize NUM_NV12_BUFFERS = 5;
-	constexpr usize NUM_NV12_BUFFER_SLOT_PER_BUFFER = 10;
+	constexpr usize NUM_NV12_BUFFERS = 4;
+	constexpr usize NUM_NV12_BUFFER_SLOT_PER_BUFFER = 5;
 
 	NV12Buffer decoded_frames_buffer[NUM_NV12_BUFFERS];
 	assert(states->frames_per_buffer % NUM_NV12_BUFFER_SLOT_PER_BUFFER == 0 && NUM_NV12_BUFFER_SLOT_PER_BUFFER > NUM_NV12_BUFFERS);
 	usize frames_per_slot(states->frames_per_buffer / NUM_NV12_BUFFER_SLOT_PER_BUFFER);
 
 	i32 max_frames_returned(0);
+	u8** ppFrame{ nullptr };
+	usize cur_video_id(0);
 
 	while (states->running) try {
 		auto filepath_opt(states->NextFile());
@@ -96,6 +98,7 @@ void video_deocder_thread(CUcontext cuda_context, VideoDecoderSyncState *states)
 			continue;
 		}
 		auto [filepath, video_id] = *filepath_opt;
+		cur_video_id = video_id;
 		FFmpegDemuxer demuxer(filepath.c_str());
 
 		BasicVideoInformation info;
@@ -108,7 +111,7 @@ void video_deocder_thread(CUcontext cuda_context, VideoDecoderSyncState *states)
 
 		i32 nVideoBytes = 0, nFrameReturned = 0, nFrame = 0;
 		NvDecoder dec(cuda_context, true, FFmpeg2NvCodecId(demuxer.GetVideoCodec()));
-		u8* pVideo = NULL, * pFrame, ** ppFrame{ nullptr };
+		u8* pVideo = NULL, * pFrame;
 
 		bool inited(false);
 		usize finished_nv12_buffer_idx(0), scheduled_nv12_buffer_idx(0);
@@ -120,6 +123,7 @@ void video_deocder_thread(CUcontext cuda_context, VideoDecoderSyncState *states)
 		usize frame_batch_offset(0);
 
 		std::vector<std::tuple<usize, FrameBatch>> active_frame_batches;
+		active_frame_batches.reserve(states->num_buffers);
 
 		auto find_next_memory_block_slot = [
 			&active_memory_block,
@@ -178,11 +182,11 @@ void video_deocder_thread(CUcontext cuda_context, VideoDecoderSyncState *states)
 			last_finished_slot = slot_id;
 			last_finished_block = block_id;
 			if (slot_id == NUM_NV12_BUFFER_SLOT_PER_BUFFER - 1) {
-				auto it = std::partition(active_frame_batches.begin(), active_frame_batches.end(), [block_id](std::tuple<usize, FrameBatch> const& item) { return std::get<0>(item) != block_id; });
+				auto it(std::partition(active_frame_batches.begin(), active_frame_batches.end(), [block_id](std::tuple<usize, FrameBatch> const& item) { return std::get<0>(item) != block_id; }));
 				FrameBatch fb(std::get<1>(*it));
 				fb.end_of_video = end_of_video;
 				states->EnqueueFrameBatch(fb);
-				active_frame_batches.erase(it, active_frame_batches.end());
+				active_frame_batches.pop_back(); //active_frame_batches.erase(it, active_frame_batches.end());
 			}
 		};
 
@@ -207,7 +211,8 @@ void video_deocder_thread(CUcontext cuda_context, VideoDecoderSyncState *states)
 					ppFrame = static_cast<u8**>(realloc(ppFrame, nFrameReturned * sizeof(u8*)));
 				else
 					ppFrame = static_cast<u8**>(malloc(nFrameReturned * sizeof(u8*)));
-				assert(ppFrame);
+				if (!ppFrame)
+					throw std::bad_alloc();
 			}
 			max_frames_returned = std::max(max_frames_returned, nFrameReturned);
 			for (i32 i(0); i != nFrameReturned; ++i)
@@ -236,7 +241,8 @@ void video_deocder_thread(CUcontext cuda_context, VideoDecoderSyncState *states)
 				decoded_frame += copied_frames;
 			}
 		}
-		if (decoded_frame % states->frames_per_buffer == 0)
+		usize remainder(decoded_frame % states->frames_per_buffer);
+		if (decoded_frame % states->frames_per_buffer == 0 || remainder > states->frames_per_buffer - frames_per_slot)
 			end_of_video = true;
 		// process remaining frames if any
 		if (decoded_frames_buffer[scheduled_nv12_buffer_idx].count && !decoded_frames_buffer[scheduled_nv12_buffer_idx].processing) {
@@ -257,8 +263,7 @@ void video_deocder_thread(CUcontext cuda_context, VideoDecoderSyncState *states)
 		notify_end_of_stream();
 	}
 	catch (std::exception ex) {
-
-		
+		states->EnqueueErrorReport(cur_video_id, std::string(ex.what()));
 	}
 }
 

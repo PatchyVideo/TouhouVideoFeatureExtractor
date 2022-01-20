@@ -107,6 +107,7 @@
     <ClInclude Include="CLIP\clip.cuh" />
     <ClInclude Include="common.h" />
     <ClInclude Include="stl_replacements\robin_hood.h" />
+    <ClInclude Include="Utils\FPSCounter.h" />
     <ClInclude Include="VideoDecoder\nv12_to_rgb_resize.cuh" />
     <ClInclude Include="VideoDecoder\NvCodecs\ColorSpace.h" />
     <ClInclude Include="VideoDecoder\NvCodecs\FFmpegDemuxer.h" />

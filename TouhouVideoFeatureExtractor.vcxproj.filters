@@ -53,5 +53,6 @@
     <ClInclude Include="wrappers\CUDAContext.h" />
     <ClInclude Include="stl_replacements\robin_hood.h" />
     <ClInclude Include="VideoDecoder\nv12_to_rgb_resize.cuh" />
+    <ClInclude Include="Utils\FPSCounter.h" />
   </ItemGroup>
 </Project>

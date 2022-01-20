@@ -33,15 +33,15 @@ inline void ThrowIfFailed(CUresult const& ret, int line, char const* filename)
 		char const* desc{ nullptr }, * name{ nullptr };
 		cuGetErrorName(ret, std::addressof(name));
 		cuGetErrorString(ret, std::addressof(desc));
-		std::cout << "[*] CUDA Driver Error at file " << filename << " line " << line << "\n";
+		std::cerr << "[*] CUDA Driver Error at file " << filename << " line " << line << "\n";
 		if (desc && name)
 		{
-			std::cout << "[*] " << name << "\n";
-			std::cout << "[*] " << desc << "\n";
+			std::cerr << "[*] " << name << "\n";
+			std::cerr << "[*] " << desc << "\n";
 		}
 		else
 		{
-			std::cout << "[*] Error acquiring description for this error\n";
+			std::cerr << "[*] Error acquiring description for this error\n";
 		}
 		throw std::runtime_error("CUDA Driver Error");
 	}
@@ -52,15 +52,15 @@ inline void ThrowIfFailed(cudaError_t const& ret, int line, char const* filename
 	if (ret != cudaError_t::cudaSuccess)
 	{
 		char const* desc{ cudaGetErrorString(ret) }, * name{ cudaGetErrorName(ret) };
-		std::cout << "[*] CUDA Runtime Error at file " << filename << " line " << line << "\n";
+		std::cerr << "[*] CUDA Runtime Error at file " << filename << " line " << line << "\n";
 		if (desc && name)
 		{
-			std::cout << "[*] " << name << "\n";
-			std::cout << "[*] " << desc << "\n";
+			std::cerr << "[*] " << name << "\n";
+			std::cerr << "[*] " << desc << "\n";
 		}
 		else
 		{
-			std::cout << "[*] Error acquiring description for this error\n";
+			std::cerr << "[*] Error acquiring description for this error\n";
 		}
 		throw std::runtime_error("CUDA Runtime Error");
 	}

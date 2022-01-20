@@ -19,11 +19,14 @@
 
 #define START_TIMER auto start = std::chrono::high_resolution_clock::now();
 
-#define STOP_TIMER(print_message) int64_t elapsedTime = std::chrono::duration_cast<std::chrono::milliseconds>( \
+#define STOP_TIMER_WITH_MESSAGE(print_message) int64_t elapsedTime = std::chrono::duration_cast<std::chrono::milliseconds>( \
     std::chrono::high_resolution_clock::now() - start).count(); \
     std::cout << print_message << \
     elapsedTime \
     << " ms " << std::endl;
+
+#define STOP_TIMER(print_message) int64_t elapsedTime = std::chrono::duration_cast<std::chrono::milliseconds>( \
+    std::chrono::high_resolution_clock::now() - start).count();
 
 #define CUDA_DRVAPI_CALL( call )                                                                                                 \
     do                                                                                                                           \

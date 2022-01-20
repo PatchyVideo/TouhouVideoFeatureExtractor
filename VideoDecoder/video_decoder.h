@@ -27,6 +27,10 @@ struct BasicVideoInformation {
 	usize video_id;
 };
 
+struct VideoDecoderErrorReport {
+	usize video_id;
+	std::string message;
+};
 
 enum class VideoDecoderMemoryBlockState {
 	Ready,
@@ -179,6 +183,22 @@ struct VideoDecoderSyncState {
 	bool running;
 	CUDADeviceMemoryUnique<u8> frames;
 
+	void EnqueueErrorReport(usize vid, std::string report) {
+		std::lock_guard<std::mutex> guard(error_reports_mutex);
+		VideoDecoderErrorReport r{ vid, report };
+		error_reports.push(r);
+	}
+
+	std::optional<VideoDecoderErrorReport> PopErrorReport() {
+		std::lock_guard<std::mutex> guard(error_reports_mutex);
+		if (error_reports.size()) {
+			auto ret(error_reports.front());
+			error_reports.pop();
+			return { ret };
+		}
+		return {};
+	}
+
 	usize num_buffers;
 	usize memory_block_stride;
 	usize frame_stride;
@@ -195,6 +215,8 @@ private:
 	std::vector<BasicVideoInformation> video_info;
 	std::mutex video_info_mutex;
 
+	std::queue<VideoDecoderErrorReport> error_reports;
+	std::mutex error_reports_mutex;
 };
 
 struct VideoDecoder {
@@ -264,15 +286,10 @@ struct VideoDecoder {
 		return m_sync_states.DequeueFrameBatch();
 	}
 
-	std::optional<
-		std::tuple<
-			usize, // unique video id
-			std::string // hunman readable error message
-		>
-	> PollErrorState() {
+	std::optional<VideoDecoderErrorReport> PollErrorReport() {
 		if (!m_sync_states.running)
 			return {};
-		return {};
+		return m_sync_states.PopErrorReport();
 	}
 
 	void Stop() {

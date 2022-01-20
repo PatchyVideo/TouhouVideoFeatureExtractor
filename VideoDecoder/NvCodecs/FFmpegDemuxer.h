@@ -65,7 +65,7 @@ private:
     FFmpegDemuxer(AVFormatContext *fmtc, int64_t timeScale = 1000 /*Hz*/) : fmtc(fmtc) {
         if (!fmtc) {
             LOG(ERROR) << "No AVFormatContext provided.";
-            throw std::exception();
+            throw std::runtime_error("No AVFormatContext provided.");
         }
 
         LOG(INFO) << "Media format: " << fmtc->iformat->long_name << " (" << fmtc->iformat->name << ")";
@@ -74,7 +74,7 @@ private:
         iVideoStream = av_find_best_stream(fmtc, AVMEDIA_TYPE_VIDEO, -1, -1, NULL, 0);
         if (iVideoStream < 0) {
             LOG(ERROR) << "FFmpeg error: " << __FILE__ << " " << __LINE__ << " " << "Could not find stream in input file";
-            throw std::exception();
+            throw std::runtime_error("Could not find stream in input file");
         }
 
         //fmtc->streams[iVideoStream]->need_parsing = AVSTREAM_PARSE_NONE;
