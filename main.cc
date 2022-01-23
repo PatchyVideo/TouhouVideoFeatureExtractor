@@ -1,6 +1,9 @@
 
 #include <iostream>
 
+#include "fast_io/fast_io.h"
+#include "fast_io/fast_io_device.h"
+
 #include "cuda_runtime.h"
 #include "device_launch_parameters.h"
 
@@ -19,16 +22,29 @@
 #include "Utils/FPSCounter.h"
 #include "Utils/lodepng.h"
 
+#include "worker.h"
+
 simplelogger::Logger* nvcodecs_logger = simplelogger::LoggerFactory::CreateConsoleLogger();
+
+
 
 struct VideoProvider {
     VideoProvider(char const* filelist) {
 
     }
+
+    std::optional<std::string> TryFetchNextVideo() {
+        return {};
+    }
 };
 
 int main()
 {
+    //char const* hello = "Hello";
+    //fast_io::obuf_file obf(fast_io::mnp::os_c_str("1.txt"));
+    //fast_io::write(obf, hello, hello + 2);
+    //print("Hello\n");
+    //return 0;
     ck2(cuInit(0));
     constexpr u32 WIDTH = 384;
     constexpr u32 HEIGHT = 384;
@@ -52,6 +68,11 @@ int main()
 
     usize num_frames(0);
     for (; finished_videos < 1;) {
+        {
+            // prevent starvation
+            using namespace std::chrono_literals;
+            std::this_thread::sleep_for(10ms);
+        }
         auto info_opt(decoder.GetVideoInformation());
         if (info_opt.has_value()) {
             auto const& info(*info_opt);
@@ -105,14 +126,13 @@ int main()
                 std::cout << "FPS: " << fps.GetFPS() << "\n";
             }
             using namespace std::chrono_literals;
-            //std::this_thread::sleep_for(100ms);
+            //std::this_thread::sleep_for(2000ms);
             frame_batch.ConsumeBatch();
             if (frame_batch.end_of_video) {
                 ++finished_videos;
             }
         }
     }
-    decoder.Stop();
     std::cout << "End\n";
     std::cout << "frames decoded: " << num_frames << "\n";
     auto end(std::chrono::high_resolution_clock::now());

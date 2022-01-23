@@ -73,7 +73,7 @@
       <FunctionLevelLinking>true</FunctionLevelLinking>
       <IntrinsicFunctions>true</IntrinsicFunctions>
       <PreprocessorDefinitions>WIN32;WIN64;NDEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
-      <LanguageStandard>stdcpp17</LanguageStandard>
+      <LanguageStandard>stdcpp20</LanguageStandard>
     </ClCompile>
     <Link>
       <GenerateDebugInformation>true</GenerateDebugInformation>
@@ -92,6 +92,7 @@
     <CudaCompile Include="CLIP\clip.cu" />
     <CudaCompile Include="TransNetV2\transnetv2.cu" />
     <CudaCompile Include="test_kernel.cu" />
+    <CudaCompile Include="Utils\RgbBytesToRgbFP32.cu" />
     <CudaCompile Include="VideoDecoder\nv12_to_rgb_resize.cu" />
     <CudaCompile Include="VideoDecoder\NvCodecs\BitDepth.cu" />
     <CudaCompile Include="VideoDecoder\NvCodecs\ColorSpace.cu" />
@@ -101,15 +102,27 @@
   <ItemGroup>
     <ClCompile Include="main.cc" />
     <ClCompile Include="Utils\lodepng.cpp" />
+    <ClCompile Include="worker.cc" />
     <ClCompile Include="VideoDecoder\NvCodecs\NvDecoder.cpp" />
     <ClCompile Include="VideoDecoder\video_decoder.cc" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="CLIP\clip.cuh" />
     <ClInclude Include="common.h" />
+    <ClInclude Include="fast_io\fast_io.h" />
+    <ClInclude Include="fast_io\fast_io_concept.h" />
+    <ClInclude Include="fast_io\fast_io_core.h" />
+    <ClInclude Include="fast_io\fast_io_crypto.h" />
+    <ClInclude Include="fast_io\fast_io_device.h" />
+    <ClInclude Include="fast_io\fast_io_freestanding.h" />
+    <ClInclude Include="fast_io\fast_io_hosted.h" />
+    <ClInclude Include="fast_io\fast_io_i18n.h" />
+    <ClInclude Include="fast_io\fast_io_legacy.h" />
     <ClInclude Include="stl_replacements\robin_hood.h" />
     <ClInclude Include="Utils\FPSCounter.h" />
     <ClInclude Include="Utils\lodepng.h" />
+    <ClInclude Include="Utils\RgbBytesToRgbFP32.cuh" />
+    <ClInclude Include="worker.h" />
     <ClInclude Include="VideoDecoder\nv12_to_rgb_resize.cuh" />
     <ClInclude Include="VideoDecoder\NvCodecs\ColorSpace.h" />
     <ClInclude Include="VideoDecoder\NvCodecs\FFmpegDemuxer.h" />
@@ -125,6 +138,12 @@
     <ClInclude Include="wrappers\CUDAThreadContext.h" />
     <ClInclude Include="TransNetV2\transnetv2.cuh" />
     <ClInclude Include="test_kernel.cuh" />
+    <ClInclude Include="wrappers\NvInferContext.h" />
+    <ClInclude Include="wrappers\NvInferEngine.h" />
+    <ClInclude Include="wrappers\NvInferRuntime.h" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="fast_io\fast_io.h.gch" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

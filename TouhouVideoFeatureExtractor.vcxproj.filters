@@ -16,6 +16,7 @@
     <ClCompile Include="VideoDecoder\video_decoder.cc" />
     <ClCompile Include="VideoDecoder\NvCodecs\NvDecoder.cpp" />
     <ClCompile Include="Utils\lodepng.cpp" />
+    <ClCompile Include="worker.cc" />
   </ItemGroup>
   <ItemGroup>
     <CudaCompile Include="test_kernel.cu">
@@ -30,6 +31,7 @@
     <CudaCompile Include="VideoDecoder\NvCodecs\crc.cu" />
     <CudaCompile Include="VideoDecoder\NvCodecs\Resize.cu" />
     <CudaCompile Include="VideoDecoder\nv12_to_rgb_resize.cu" />
+    <CudaCompile Include="Utils\RgbBytesToRgbFP32.cu" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="test_kernel.cuh">
@@ -56,5 +58,22 @@
     <ClInclude Include="VideoDecoder\nv12_to_rgb_resize.cuh" />
     <ClInclude Include="Utils\FPSCounter.h" />
     <ClInclude Include="Utils\lodepng.h" />
+    <ClInclude Include="wrappers\NvInferContext.h" />
+    <ClInclude Include="wrappers\NvInferEngine.h" />
+    <ClInclude Include="wrappers\NvInferRuntime.h" />
+    <ClInclude Include="Utils\RgbBytesToRgbFP32.cuh" />
+    <ClInclude Include="worker.h" />
+    <ClInclude Include="fast_io\fast_io.h" />
+    <ClInclude Include="fast_io\fast_io_concept.h" />
+    <ClInclude Include="fast_io\fast_io_core.h" />
+    <ClInclude Include="fast_io\fast_io_crypto.h" />
+    <ClInclude Include="fast_io\fast_io_device.h" />
+    <ClInclude Include="fast_io\fast_io_freestanding.h" />
+    <ClInclude Include="fast_io\fast_io_hosted.h" />
+    <ClInclude Include="fast_io\fast_io_i18n.h" />
+    <ClInclude Include="fast_io\fast_io_legacy.h" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="fast_io\fast_io.h.gch" />
   </ItemGroup>
 </Project>

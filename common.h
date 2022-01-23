@@ -20,6 +20,7 @@
 #include <optional>
 #include <mutex>
 #include <queue>
+#include <condition_variable>
 
 #undef max
 #undef min

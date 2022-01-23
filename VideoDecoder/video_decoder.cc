@@ -8,7 +8,7 @@
 #undef max
 #undef min
 
-namespace video_deocder_impl {
+namespace video_deocder_details {
 
 struct NV12Buffer {
 	CUDADeviceMemoryUnique<u8> data;
@@ -105,7 +105,8 @@ void video_deocder_thread(CUcontext cuda_context, VideoDecoderSyncState *states)
 	while (states->running) try {
 		auto filepath_opt(states->NextFile());
 		if (!filepath_opt.has_value()) {
-			std::this_thread::yield();
+			using namespace std::chrono_literals;
+			std::this_thread::sleep_for(10ms);
 			continue;
 		}
 		auto [filepath, video_id] = *filepath_opt;
@@ -148,16 +149,7 @@ void video_deocder_thread(CUcontext cuda_context, VideoDecoderSyncState *states)
 			&active_frame_batches
 		]() -> std::tuple<CUdeviceptr, usize, usize> {
 			if (active_memory_block == std::numeric_limits<usize>::max()) {
-				usize memory_block_id;
-				while (states->running) {
-					auto memory_block_id_opt(states->NextMemoryBlock());
-					if (!memory_block_id_opt.has_value()) {
-						std::this_thread::yield();
-						continue;
-					}
-					memory_block_id = *memory_block_id_opt;
-					break;
-				}
+				usize memory_block_id(states->NextMemoryBlock());
 				FrameBatch fb(states, memory_block_id);
 				fb.frames_gpu = states->frames.at_offset(states->memory_block_stride, memory_block_id);
 				fb.frame_offset = frame_batch_offset;

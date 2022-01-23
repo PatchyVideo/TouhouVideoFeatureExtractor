@@ -8,7 +8,7 @@
 
 struct VideoDecoderSyncState;
 
-namespace video_deocder_impl {
+namespace video_deocder_details {
 
 	void video_deocder_thread(
 		CUcontext cuda_context,
@@ -88,7 +88,7 @@ struct VideoDecoderSyncState {
 			memory_block_states.push_back(VideoDecoderMemoryBlockState::Ready);
 			free_memory_blocks.push_back(i);
 		}
-		video_info.reserve(video_deocder_impl::VIDEO_DECODER_DEFAULT_QUEUE_SIZE);
+		video_info.reserve(video_deocder_details::VIDEO_DECODER_DEFAULT_QUEUE_SIZE);
 	}
 
 	VideoDecoderSyncState(VideoDecoderSyncState const& a) = delete;
@@ -97,10 +97,13 @@ struct VideoDecoderSyncState {
 	VideoDecoderSyncState& operator=(VideoDecoderSyncState&& a) = delete;
 
 	void MemoryBlockStateTransition(usize id, VideoDecoderMemoryBlockState state) {
-		std::lock_guard<std::mutex> guard(memory_block_mutex);
+		std::unique_lock<std::mutex> lock(memory_block_mutex);
 		memory_block_states[id] = state;
-		if (state == VideoDecoderMemoryBlockState::Ready)
+		if (state == VideoDecoderMemoryBlockState::Ready) {
 			free_memory_blocks.push_back(id);
+			lock.unlock();
+			memory_block_cv.notify_one();
+		}
 	}
 
 	std::optional<std::tuple<std::string, usize>> NextFile() {
@@ -139,24 +142,23 @@ struct VideoDecoderSyncState {
 		file_queue.push({ filepath, id });
 	}
 
+	bool VideoEnqueueRecommended() {
+		std::lock_guard<std::mutex> guard(file_queue_mutex);
+		return file_queue.size() <= video_deocder_details::VIDEO_DECODER_DEFAULT_QUEUE_SIZE;
+	}
+
 	void Stop() {
 		running = false;
 	}
 
-	std::optional<usize> NextMemoryBlock() {
-		std::lock_guard<std::mutex> guard(memory_block_mutex);
-		if (free_memory_blocks.size()) {
-			usize id(free_memory_blocks.back());
-			free_memory_blocks.pop_back();
-			memory_block_states[id] = VideoDecoderMemoryBlockState::Filling;
-			return { id };
-		}
-		else {
-			return {};
-		}
+	usize NextMemoryBlock() {
+		std::unique_lock<std::mutex> lock(memory_block_mutex);
+		memory_block_cv.wait(lock, [this] { return free_memory_blocks.size() != 0; });
+		usize id(free_memory_blocks.back());
+		free_memory_blocks.pop_back();
+		memory_block_states[id] = VideoDecoderMemoryBlockState::Filling;
+		return id;
 	}
-
-
 
 	void PushVideoInformation(usize id, BasicVideoInformation info) {
 		std::lock_guard<std::mutex> guard(video_info_mutex);
@@ -217,6 +219,7 @@ private:
 	std::vector<usize> free_memory_blocks;
 	std::queue<FrameBatch> filled_memory_blocks;
 	std::mutex memory_block_mutex;
+	std::condition_variable memory_block_cv;
 
 	std::vector<BasicVideoInformation> video_info;
 	std::mutex video_info_mutex;
@@ -230,22 +233,37 @@ struct VideoDecoder {
 		m_cuda_context(cuda_context),
 		m_sync_states(num_buffers, frames_per_buffer, resize_width, resize_height)
 	{
-		for (usize i(0); i != video_deocder_impl::VIDEO_DECODER_DEFAULT_THREAD_COUNT; ++i)
-			m_thread[i] = std::thread(video_deocder_impl::video_deocder_thread, cuda_context, &m_sync_states);
+		for (usize i(0); i != video_deocder_details::VIDEO_DECODER_DEFAULT_THREAD_COUNT; ++i)
+			m_thread[i] = std::thread(video_deocder_details::video_deocder_thread, cuda_context, &m_sync_states);
 	}
 
 	VideoDecoder(VideoDecoder const& a) = delete;
 	VideoDecoder& operator=(VideoDecoder const& a) = delete;
 
-	~VideoDecoder() {
+	~VideoDecoder() noexcept {
 		try {
-			// TODO: remember to release all resources
-			if (m_sync_states.running)
+			if (m_sync_states.running) {
 				Stop();
+				Join();
+			}
 		}
 		catch (...) {
 
 		}
+	}
+
+	void Join() {
+		for (auto& t : m_thread)
+			t.join();
+	}
+
+	/**
+	*   @brief  Tells caller if the video decoder recommends enqueue a new video
+	*   @param  None
+	*   @return bool
+	*/
+	bool VideoEnqueueRecommended() {
+		return m_sync_states.VideoEnqueueRecommended();
 	}
 
 	/**
@@ -302,7 +320,7 @@ struct VideoDecoder {
 	void Stop() {
 		if (m_sync_states.running) {
 			m_sync_states.running = false;
-			for (usize i(0); i != video_deocder_impl::VIDEO_DECODER_DEFAULT_THREAD_COUNT; ++i)
+			for (usize i(0); i != video_deocder_details::VIDEO_DECODER_DEFAULT_THREAD_COUNT; ++i)
 				m_thread[i].join();
 		}
 	}
@@ -310,5 +328,5 @@ struct VideoDecoder {
 private:
 	CUcontext m_cuda_context;
 	VideoDecoderSyncState m_sync_states;
-	std::thread m_thread[video_deocder_impl::VIDEO_DECODER_DEFAULT_THREAD_COUNT];
+	std::thread m_thread[video_deocder_details::VIDEO_DECODER_DEFAULT_THREAD_COUNT];
 };
