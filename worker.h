@@ -28,11 +28,12 @@ private:
 
 namespace worker_details {
 
-void worker_thread(Worker* self);
+void worker_thread(CUcontext cuda_context, Worker* self);
 
 struct Worker {
 	Worker() = default;
 	Worker(
+		CUcontext cuda_context,
 		usize worker_id,
 
 		std::queue<WorkResponse>* finished_works,
@@ -53,7 +54,7 @@ struct Worker {
 	{
 		submitted_job_mutex = new std::mutex;
 		submitted_job_cv = new std::condition_variable;
-		thread = std::thread(worker_thread, this);
+		thread = std::thread(worker_thread, cuda_context, this);
 	}
 
 	Worker(Worker const& a) = delete;
@@ -164,12 +165,12 @@ struct Worker {
 };
 
 struct WorkerManager {
-	WorkerManager(usize num_workers) :
+	WorkerManager(CUcontext cuda_context, usize num_workers) :
 		running(true),
 		num_workers(num_workers)
 	{
 		for (usize i(0); i != num_workers; ++i) {
-			workers.emplace_back(i, std::addressof(finished_works), std::addressof(finished_works_mutex), std::addressof(free_workers), std::addressof(free_workers_mutex));
+			workers.emplace_back(cuda_context, i, std::addressof(finished_works), std::addressof(finished_works_mutex), std::addressof(free_workers), std::addressof(free_workers_mutex));
 		}
 	}
 

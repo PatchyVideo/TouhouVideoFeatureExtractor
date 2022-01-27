@@ -4,10 +4,11 @@
 
 namespace worker_details {
 
-void worker_thread(Worker* self) {
+void worker_thread(CUcontext cuda_context, Worker* self) {
+	CUDAThreadContext cuda_thread_ctx(cuda_context);
 
-	CUDADeviceMemoryUnique<f32> tmp_f32_1;
-	CUDADeviceMemoryUnique<u8> tmp_u8_1;
+	CUDADeviceMemoryUnique<f32> scratch_f32_1;
+	CUDADeviceMemoryUnique<u8> scratch_u8_1;
 
 	while (self->running) {
 		auto task_opt(self->GetJob());

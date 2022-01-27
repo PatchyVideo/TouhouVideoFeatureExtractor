@@ -22,7 +22,7 @@
     <CudaCompile Include="test_kernel.cu">
       <Filter>CUDA</Filter>
     </CudaCompile>
-    <CudaCompile Include="TransNetV2\transnetv2.cu">
+    <CudaCompile Include="TransNet\transnet.cu">
       <Filter>CUDA</Filter>
     </CudaCompile>
     <CudaCompile Include="CLIP\clip.cu" />
@@ -37,7 +37,7 @@
     <ClInclude Include="test_kernel.cuh">
       <Filter>CUDA</Filter>
     </ClInclude>
-    <ClInclude Include="TransNetV2\transnetv2.cuh">
+    <ClInclude Include="TransNet\transnet.cuh">
       <Filter>CUDA</Filter>
     </ClInclude>
     <ClInclude Include="wrappers\CUDAThreadContext.h" />

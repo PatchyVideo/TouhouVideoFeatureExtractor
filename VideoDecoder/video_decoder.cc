@@ -92,7 +92,7 @@ void video_deocder_thread(CUcontext cuda_context, VideoDecoderSyncState *states)
 	CUDAThreadContext cuda_thread_ctx(cuda_context);
 
 	constexpr usize NUM_NV12_BUFFERS = 4;
-	constexpr usize NUM_NV12_BUFFER_SLOT_PER_BUFFER = 5;
+	constexpr usize NUM_NV12_BUFFER_SLOT_PER_BUFFER = 9;
 
 	NV12Buffer decoded_frames_buffer[NUM_NV12_BUFFERS];
 	assert(states->frames_per_buffer % NUM_NV12_BUFFER_SLOT_PER_BUFFER == 0 && NUM_NV12_BUFFER_SLOT_PER_BUFFER > NUM_NV12_BUFFERS);

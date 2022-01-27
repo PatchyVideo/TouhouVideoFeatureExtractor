@@ -24,6 +24,8 @@
 
 #include "worker.h"
 
+#include <npp.h>
+
 simplelogger::Logger* nvcodecs_logger = simplelogger::LoggerFactory::CreateConsoleLogger();
 
 
@@ -38,6 +40,46 @@ struct VideoProvider {
     }
 };
 
+void test_nppi(u8* dst, i32 dst_width, i32 dst_height, u8* src, i32 src_width, i32 src_height, usize num_images) {
+    num_images *= 3;
+    num_images = 2;
+    NppiSize src_size = {
+        .width = src_width,
+        .height = src_height
+    };
+    NppiRect src_rect = {
+        .x = 0,
+        .y = 0,
+        .width = src_width,
+        .height = src_height
+    };
+    NppiSize dst_size = {
+        .width = dst_width,
+        .height = dst_height
+    };
+    NppiRect dst_rect = {
+        .x = 0,
+        .y = 0,
+        .width = dst_width,
+        .height = dst_height
+    };
+    i32 src_stride(src_width * src_height), dst_stride(dst_width * dst_height);
+    std::vector<NppiResizeBatchCXR> cxrs(num_images);
+    for (usize i(0); i != num_images; ++i) {
+        cxrs[i].pSrc = src + i * src_stride;
+        cxrs[i].pDst = dst + i * dst_stride;
+        cxrs[i].nSrcStep = src_width;
+        cxrs[i].nDstStep = dst_width;
+    }
+    NppiResizeBatchCXR *cxr_device;
+    ck2(cudaMalloc(&cxr_device, sizeof(NppiResizeBatchCXR) * num_images));
+    ck2(cudaMemcpy(cxr_device, cxrs.data(), num_images * sizeof(NppiResizeBatchCXR), cudaMemcpyHostToDevice));
+    cudaDeviceSynchronize();
+    auto status = nppiResizeBatch_8u_C1R(src_size, src_rect, dst_size, dst_rect, NPPI_INTER_LINEAR, cxr_device, 1);
+    printf("status: %d\n", status);
+    ck2(cudaFree(cxr_device));
+}
+
 int main()
 {
     //char const* hello = "Hello";
@@ -46,15 +88,15 @@ int main()
     //print("Hello\n");
     //return 0;
     ck2(cuInit(0));
-    constexpr u32 WIDTH = 384;
-    constexpr u32 HEIGHT = 384;
+    constexpr u32 WIDTH = 288;
+    constexpr u32 HEIGHT = 288;
     constexpr usize FRAME_STRIDE = WIDTH * HEIGHT * 3;
 
     CUDAContext context(0, 0);
 
     robin_hood::unordered_set<usize> ongoing_videos;
 
-    VideoDecoder decoder(context, 3, 300, WIDTH, HEIGHT);
+    VideoDecoder decoder(context, 5, 900, WIDTH, HEIGHT);
     //decoder.EnqueueDecode("..\\test_videos\\mokou_remi.mp4", 123);
     //decoder.EnqueueDecode("..\\test_videos\\2.mp4", 124);
     decoder.EnqueueDecode("..\\test_videos\\1.flv", 125);
@@ -107,7 +149,7 @@ int main()
                 u8* frame_chw_gpu(frame_batch.frames_gpu + FRAME_STRIDE * frame_idx);
                 std::vector<u8> frame_chw(FRAME_STRIDE);
                 std::vector<u8> frame_hwc(WIDTH * HEIGHT * 4);
-                cuMemcpyDtoH(frame_chw.data(), (CUdeviceptr)frame_chw_gpu, FRAME_STRIDE);
+                cuMemcpyDtoH(frame_chw.data(), (CUdeviceptr)frame_chw_gpu, WIDTH * HEIGHT * 3);
                 for (usize i(0); i != HEIGHT; ++i) {
                     for (usize j(0); j != WIDTH; ++j) {
                         u8* dst(frame_hwc.data() + (i * WIDTH + j) * 4);

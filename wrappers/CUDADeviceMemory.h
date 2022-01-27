@@ -53,6 +53,13 @@ struct CUDADeviceMemoryUnique
 		ck2(cuMemcpyDtoHAsync(output, ptr, size_bytes(), stream));
 	}
 
+	void download_partial(CUDAHostMemoryUnique<T>& output, usize n, CUstream stream) const
+	{
+		if (output.empty() || output.size() < sizeof(T) * n)
+			output = std::move(CUDAHostMemoryUnique<T>(size()));
+		ck2(cuMemcpyDtoHAsync(output, ptr, sizeof(T) * n, stream));
+	}
+
 	void download_block(CUDAHostMemoryUnique<T>& output, CUstream stream = nullptr) const
 	{
 		if (stream)
@@ -76,7 +83,7 @@ struct CUDADeviceMemoryUnique
 			ck2(cuMemAlloc(std::addressof(ptr), input.size() * sizeof(T)));
 			len = input.size();
 		}
-		ck2(cuMemcpyHtoDAsync(ptr, input, size_bytes(), stream));
+		ck2(cuMemcpyHtoDAsync(ptr, input, input.size_bytes(), stream));
 	}
 
 	void upload(std::vector<T> const& input, CUstream stream = nullptr)
@@ -87,7 +94,29 @@ struct CUDADeviceMemoryUnique
 			ck2(cuMemAlloc(std::addressof(ptr), input.size() * sizeof(T)));
 			len = input.size();
 		}
-		ck2(cuMemcpyHtoDAsync(ptr, input.data(), size_bytes(), stream));
+		ck2(cuMemcpyHtoDAsync(ptr, input.data(), sizeof(T) * input.size(), stream));
+	}
+
+	void upload(T const*const input, usize num_elements, CUstream stream = nullptr)
+	{
+		if (empty() || size() != num_elements)
+		{
+			this->~CUDADeviceMemoryUnique();
+			ck2(cuMemAlloc(std::addressof(ptr), num_elements * sizeof(T)));
+			len = num_elements;
+		}
+		ck2(cuMemcpyHtoDAsync(ptr, input, num_elements * sizeof(T), stream));
+	}
+
+	void upload_partial(T const* const input, usize num_elements, CUstream stream = nullptr)
+	{
+		if (empty() || size() < num_elements)
+		{
+			this->~CUDADeviceMemoryUnique();
+			ck2(cuMemAlloc(std::addressof(ptr), num_elements * sizeof(T)));
+			len = num_elements;
+		}
+		ck2(cuMemcpyHtoDAsync(ptr, input, num_elements * sizeof(T), stream));
 	}
 
 	void upload_block(CUDAHostMemoryUnique<T> const& input, CUstream stream = nullptr)
