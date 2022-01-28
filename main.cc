@@ -10,14 +10,13 @@
 #include <stdio.h>
 
 #include "common.h"
+#include "stl_replacements/robin_hood.h"
 
 #include "wrappers/CUDAContext.h"
+#include "wrappers/NvInferRuntime.h"
 
-#include "test_kernel.cuh"
 #include "VideoDecoder/NvCodecs/Logger.h"
-
 #include "VideoDecoder/video_decoder.h"
-#include "stl_replacements/robin_hood.h"
 
 #include "Utils/FPSCounter.h"
 #include "Utils/lodepng.h"
@@ -28,7 +27,15 @@
 
 simplelogger::Logger* nvcodecs_logger = simplelogger::LoggerFactory::CreateConsoleLogger();
 
-
+class Logger : public nvinfer1::ILogger
+{
+    void log(Severity severity, const char* msg) noexcept override
+    {
+        // suppress info-level messages
+        //if (severity != Severity::kINFO)
+        std::cout << msg << std::endl;
+    }
+} g_trtLogger;
 
 struct VideoProvider {
     VideoProvider(char const* filelist) {
@@ -40,44 +47,34 @@ struct VideoProvider {
     }
 };
 
-void test_nppi(u8* dst, i32 dst_width, i32 dst_height, u8* src, i32 src_width, i32 src_height, usize num_images) {
-    num_images *= 3;
-    num_images = 2;
-    NppiSize src_size = {
-        .width = src_width,
-        .height = src_height
-    };
-    NppiRect src_rect = {
-        .x = 0,
-        .y = 0,
-        .width = src_width,
-        .height = src_height
-    };
-    NppiSize dst_size = {
-        .width = dst_width,
-        .height = dst_height
-    };
-    NppiRect dst_rect = {
-        .x = 0,
-        .y = 0,
-        .width = dst_width,
-        .height = dst_height
-    };
-    i32 src_stride(src_width * src_height), dst_stride(dst_width * dst_height);
-    std::vector<NppiResizeBatchCXR> cxrs(num_images);
-    for (usize i(0); i != num_images; ++i) {
-        cxrs[i].pSrc = src + i * src_stride;
-        cxrs[i].pDst = dst + i * dst_stride;
-        cxrs[i].nSrcStep = src_width;
-        cxrs[i].nDstStep = dst_width;
+struct ReorderBuffer {
+    void Reserve(usize pos, usize size) {
+
     }
-    NppiResizeBatchCXR *cxr_device;
-    ck2(cudaMalloc(&cxr_device, sizeof(NppiResizeBatchCXR) * num_images));
-    ck2(cudaMemcpy(cxr_device, cxrs.data(), num_images * sizeof(NppiResizeBatchCXR), cudaMemcpyHostToDevice));
-    cudaDeviceSynchronize();
-    auto status = nppiResizeBatch_8u_C1R(src_size, src_rect, dst_size, dst_rect, NPPI_INTER_LINEAR, cxr_device, 1);
-    printf("status: %d\n", status);
-    ck2(cudaFree(cxr_device));
+    template<
+        fast_io::stream handletype,
+        fast_io::buffer_mode mde,
+        typename decorators,
+        std::size_t bfs, ::fast_io::freestanding::random_access_iterator Iter
+    > requires (((mde& fast_io::buffer_mode::out) == fast_io::buffer_mode::out) && fast_io::details::allow_iobuf_punning<typename decorators::internal_type, Iter>)
+    bool Complete(usize pos, fast_io::basic_io_buffer<handletype, mde, decorators, bfs>& bios, u8 const* const data) {
+
+    }
+};
+
+nvinfer1::ICudaEngine* LoadEngineFromFile(std::string_view filename, nvinfer1::IRuntime* runtime)
+{
+    std::ifstream file(filename.data(), std::ios::binary | std::ios::ate);
+    std::streamsize size = file.tellg();
+    file.seekg(0, std::ios::beg);
+
+    std::vector<char> buffer(size);
+    if (file.read(buffer.data(), size))
+    {
+        nvinfer1::ICudaEngine* engine = runtime->deserializeCudaEngine(buffer.data(), size, nullptr);
+        return engine;
+    }
+    return nullptr;
 }
 
 int main()
@@ -93,6 +90,12 @@ int main()
     constexpr usize FRAME_STRIDE = WIDTH * HEIGHT * 3;
 
     CUDAContext context(0, 0);
+
+    NvInferRuntime trt_runtime(g_trtLogger);
+    nvinfer1::ICudaEngine* transnet_engine(LoadEngineFromFile("models/transnet.trt", trt_runtime.runtime));
+    nvinfer1::ICudaEngine* clip_engine(LoadEngineFromFile("models/RN50x4.trt", trt_runtime.runtime));
+
+    WorkerManager workers(context, transnet_engine, clip_engine, 1);
 
     robin_hood::unordered_set<usize> ongoing_videos;
 
@@ -163,6 +166,17 @@ int main()
                     }
                 }
                 lodepng::encode("..\\test_videos\\1.flv.png", frame_hwc, WIDTH, HEIGHT);
+                WorkRequest req{ .frames = frame_batch, .custom_data = 0 };
+                workers.SubmitWork(req);
+                for (;;) {
+                    auto r(workers.PollResponse());
+                    if (r.has_value()) {
+                        auto& r2(*r);
+                        std::cout << "n_feats: " << r2.num_results << "\n";
+                        r2.ConsumeResponse();
+                        break;
+                    }
+                }
             }
             if (fps.Update(frame_batch.number_of_frames)) {
                 std::cout << "FPS: " << fps.GetFPS() << "\n";
@@ -180,6 +194,9 @@ int main()
     auto end(std::chrono::high_resolution_clock::now());
     auto elpased(std::chrono::duration_cast<std::chrono::milliseconds>(end - start));
     std::cout << "Total " << elpased.count() << " ms\n";
+
+    delete transnet_engine;
+    delete clip_engine;
 
     return 0;
 }

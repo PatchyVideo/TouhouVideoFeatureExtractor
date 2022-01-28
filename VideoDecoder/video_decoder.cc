@@ -51,7 +51,7 @@ struct NV12Buffer {
 		std::size_t remaining_spaces(capacity - count);
 		std::size_t frames_to_copy(std::min(num_frames, remaining_spaces));
 		for (std::size_t i(0); i < frames_to_copy; ++i)
-			ck2(cuMemcpy((CUdeviceptr)data.at_offset(element_size, count + i), (CUdeviceptr)frames[i], element_size));
+			ck2(cuMemcpyAsync((CUdeviceptr)data.at_offset(element_size, count + i), (CUdeviceptr)frames[i], element_size, stream));
 		count += frames_to_copy;
 		return { num_frames - frames_to_copy, frames_to_copy, count >= capacity };
 	}

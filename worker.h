@@ -9,6 +9,7 @@
 
 struct WorkRequest {
 	FrameBatch frames;
+	usize custom_data;
 };
 
 namespace worker_details {
@@ -22,6 +23,8 @@ struct WorkResponse {
 	i32 const* const frame_indices;
 	usize frame_indices_stride;
 
+	usize custom_data;
+
 	void ConsumeResponse();
 
 	WorkResponse(
@@ -30,14 +33,16 @@ struct WorkResponse {
 		u8 const* const features,
 		usize features_stride,
 		i32 const* const frame_indices,
-		usize frame_indices_stride
+		usize frame_indices_stride,
+		usize custom_data
 	) :
 		num_results(num_results),
 		features(features),
 		features_stride(features_stride),
 		frame_indices(frame_indices),
 		frame_indices_stride(frame_indices_stride),
-		associated_worker(self)
+		associated_worker(self),
+		custom_data(custom_data)
 	{
 
 	}
@@ -68,7 +73,7 @@ struct Worker {
 		transnet_engine(transnet_engine),
 		clip_engine(clip_engine),
 		doing_work(false),
-		running(false),
+		running(true),
 		worker_id(worker_id),
 		finished_works(finished_works),
 		finished_works_mutex(finished_works_mutex),
@@ -208,6 +213,7 @@ struct WorkerManager {
 	{
 		for (usize i(0); i != num_workers; ++i) {
 			workers.emplace_back(cuda_context, transnet_engine, clip_engine, i, std::addressof(finished_works), std::addressof(finished_works_mutex), std::addressof(free_workers), std::addressof(free_workers_mutex));
+			free_workers.push_back(i);
 		}
 	}
 

@@ -17,8 +17,10 @@ struct NvInferRuntime
 	{
 		try
 		{
-			if (runtime)
-				runtime->destroy();
+			if (runtime) {
+				delete runtime;
+				runtime = nullptr;
+			}
 		} catch (...)
 		{
 

@@ -19,9 +19,6 @@
     <ClCompile Include="worker.cc" />
   </ItemGroup>
   <ItemGroup>
-    <CudaCompile Include="test_kernel.cu">
-      <Filter>CUDA</Filter>
-    </CudaCompile>
     <CudaCompile Include="TransNet\transnet.cu">
       <Filter>CUDA</Filter>
     </CudaCompile>
@@ -34,9 +31,6 @@
     <CudaCompile Include="Utils\RgbBytesToRgbFP32.cu" />
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="test_kernel.cuh">
-      <Filter>CUDA</Filter>
-    </ClInclude>
     <ClInclude Include="TransNet\transnet.cuh">
       <Filter>CUDA</Filter>
     </ClInclude>

@@ -24,7 +24,7 @@ void worker_thread(CUcontext cuda_context, Worker* self) {
 	transnet_dims.d[3] = 27;
 	transnet_dims.d[4] = 48;
 	transnet_ctx->setBindingDimensions(0, transnet_dims);
-	clip_ctx->setBindingDimensions(0, nvinfer1::Dims4(1, 8, CLIP_HEIGHT, CLIP_WIDTH));
+	clip_ctx->setBindingDimensions(0, nvinfer1::Dims4(8, 3, CLIP_HEIGHT, CLIP_WIDTH));
 
 	CUDADeviceMemoryUnique<f32> scratch_f32_1;
 	CUDADeviceMemoryUnique<f32> scratch_f32_2;
@@ -52,6 +52,7 @@ void worker_thread(CUcontext cuda_context, Worker* self) {
 		key_frames.clear();
 		feature_key_frames.clear();
 		FrameBatch fb(task_opt->frames);
+		usize custom_data(task_opt->custom_data);
 		run_transnet(
 			transnet_ctx,
 			transnet_scores.at_offset(0, 0),
@@ -117,7 +118,8 @@ void worker_thread(CUcontext cuda_context, Worker* self) {
 				reinterpret_cast<u8 const* const>(clip_features_cpu.at_offset(0, 0)),
 				sizeof(f32) * CLIP_FEATURE_SIZE,
 				feature_key_frames.data(),
-				sizeof(*feature_key_frames.data())
+				sizeof(*feature_key_frames.data()),
+				custom_data
 			)
 		);
 	}

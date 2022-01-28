@@ -62,16 +62,11 @@ __global__ void create_padding_kernel(
 		src_frame = inout_frames + frame_stride * (num_frames + 25 - 1);
 		dst_frame = inout_frames + frame_stride * (num_frames + 25) + frame_stride * (iz - 1);
 	}
-	__shared__ f32 frame[3][27][48];
 	if (ix < 48 && iy < 27) {
-		frame[0][iy][ix] = *(src_frame + 48 * 27 * 0 + 48 * iy + ix);
-		frame[1][iy][ix] = *(src_frame + 48 * 27 * 1 + 48 * iy + ix);
-		frame[2][iy][ix] = *(src_frame + 48 * 27 * 2 + 48 * iy + ix);
-		__syncthreads();
 		for (u32 i(0); i < 25; ++i) {
-			*(dst_frame + frame_stride * i + 48 * 27 * 0 + 48 * iy + ix) = frame[0][iy][ix];
-			*(dst_frame + frame_stride * i + 48 * 27 * 1 + 48 * iy + ix) = frame[1][iy][ix];
-			*(dst_frame + frame_stride * i + 48 * 27 * 2 + 48 * iy + ix) = frame[2][iy][ix];
+			*(dst_frame + frame_stride * i + 48 * 27 * 0 + 48 * iy + ix) = *(src_frame + 48 * 27 * 0 + 48 * iy + ix);
+			*(dst_frame + frame_stride * i + 48 * 27 * 1 + 48 * iy + ix) = *(src_frame + 48 * 27 * 1 + 48 * iy + ix);
+			*(dst_frame + frame_stride * i + 48 * 27 * 2 + 48 * iy + ix) = *(src_frame + 48 * 27 * 2 + 48 * iy + ix);
 		}
 	}
 }
@@ -112,8 +107,8 @@ void downsample_nn_and_to_fp32_1C(
 	CUstream stream
 ) {
 	//dst_height + 1 to make num thread multiple of wrap size
-	dim3 block(dst_wdith, dst_height + 1, 1);
-	dim3 grid(1, 1, (num_images - 1) / 10 + 1);
+	dim3 block(32, 32, 1);
+	dim3 grid(2, 1, (num_images - 1) / 10 + 1);
 	downsample_nn_and_to_fp32_1C_kernel<<<grid, block, 0, stream>>>(dst, dst_wdith, dst_height, src, src_width, src_height, num_images);
 	ck2(cudaGetLastError());
 }
@@ -159,8 +154,8 @@ void run_transnet(
 	//ck2(cudaGetLastError());
 
 	// pad 25 frames to head and tail
-	dim3 block_padding(48, 28, 1);
-	dim3 grid_padding(1, 1, 2);
+	dim3 block_padding(32, 32, 1);
+	dim3 grid_padding(2, 1, 2);
 	create_padding_kernel<<<grid_padding, block_padding, 0, stream>>>(reinterpret_cast<f32*>(scratch_f32_1.ptr), 48 * 27 * 3, num_frames);
 	ck2(cudaGetLastError());
 
