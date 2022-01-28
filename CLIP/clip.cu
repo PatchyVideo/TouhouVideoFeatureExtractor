@@ -83,7 +83,6 @@ void run_clip(
 	CUstream stream
 ) {
 	constexpr u32 output_batch_size = 8;
-	constexpr u32 out_feature_size = 640;
 	auto reduced_region_width(width / 16);
 	auto num_contiguous_regions(num_key_frames);
 
@@ -92,7 +91,7 @@ void run_clip(
 	{
 		auto pad_size(output_batch_size - (num_contiguous_regions % output_batch_size));
 		for (std::size_t i(0); i < pad_size; ++i)
-			key_frame_indices[num_contiguous_regions++] = -1;
+			key_frame_indices[num_contiguous_regions++] = -1; // overflows the vector size, but not capacity
 	}
 
 	// upload indices
@@ -107,8 +106,8 @@ void run_clip(
 		scratch_f32_1.reallocate(num_contiguous_regions * 3 * height * width);
 
 	// allocate space for features
-	if (out_features.empty() || out_features.size() < num_contiguous_regions * out_feature_size)
-		out_features.reallocate(num_contiguous_regions * out_feature_size);
+	if (out_features.empty() || out_features.size() < num_contiguous_regions * CLIP_FEATURE_SIZE)
+		out_features.reallocate(num_contiguous_regions * CLIP_FEATURE_SIZE);
 
 	// extract contiguous key frames
 	dim3 block(32, 32, 1);
@@ -123,10 +122,10 @@ void run_clip(
 	for (usize i(0); i < num_contiguous_regions; i += output_batch_size) {
 		std::vector<void*> bindings{
 			scratch_f32_1.at_offset(width * height * 3, i),
-			out_features.at_offset(out_feature_size, i),
+			out_features.at_offset(CLIP_FEATURE_SIZE, i),
 		};
 
-		// enqueue TransNet
+		// enqueue CLIP
 		if (!clip_trt_ctx->enqueueV2(bindings.data(), stream, nullptr)) {
 			throw std::runtime_error("enqueue failed!!!");
 		}

@@ -1,5 +1,7 @@
 #pragma once
 
+#include <NvInfer.h>
+
 #include "common.h"
 #include "VideoDecoder/video_decoder.h"
 
@@ -17,10 +19,28 @@ struct WorkResponse {
 	usize num_results;
 	u8 const* const features;
 	usize features_stride;
-	u8 const* const frame_indices;
+	i32 const* const frame_indices;
 	usize frame_indices_stride;
 
 	void ConsumeResponse();
+
+	WorkResponse(
+		worker_details::Worker* self,
+		usize num_results,
+		u8 const* const features,
+		usize features_stride,
+		i32 const* const frame_indices,
+		usize frame_indices_stride
+	) :
+		num_results(num_results),
+		features(features),
+		features_stride(features_stride),
+		frame_indices(frame_indices),
+		frame_indices_stride(frame_indices_stride),
+		associated_worker(self)
+	{
+
+	}
 private:
 	worker_details::Worker* associated_worker;
 };
@@ -34,6 +54,9 @@ struct Worker {
 	Worker() = default;
 	Worker(
 		CUcontext cuda_context,
+		nvinfer1::ICudaEngine* transnet_engine,
+		nvinfer1::ICudaEngine* clip_engine,
+
 		usize worker_id,
 
 		std::queue<WorkResponse>* finished_works,
@@ -42,6 +65,8 @@ struct Worker {
 		std::vector<usize>* free_workers,
 		std::mutex* free_workers_mutex
 	) :
+		transnet_engine(transnet_engine),
+		clip_engine(clip_engine),
 		doing_work(false),
 		running(false),
 		worker_id(worker_id),
@@ -60,6 +85,8 @@ struct Worker {
 	Worker(Worker const& a) = delete;
 	Worker& operator=(Worker const& a) = delete;
 	Worker(Worker&& other) noexcept :
+		transnet_engine(other.transnet_engine),
+		clip_engine(other.clip_engine),
 		worker_id(other.worker_id),
 		finished_works(other.finished_works),
 		finished_works_mutex(other.finished_works_mutex),
@@ -81,6 +108,8 @@ struct Worker {
 	{
 		if (std::addressof(other) != this)
 		{
+			transnet_engine = other.transnet_engine;
+			clip_engine = other.clip_engine;
 			worker_id = other.worker_id;
 			finished_works = other.finished_works;
 			finished_works_mutex = other.finished_works_mutex;
@@ -160,17 +189,25 @@ struct Worker {
 	std::condition_variable *submitted_job_cv;
 
 	std::thread thread;
+
+	nvinfer1::ICudaEngine* transnet_engine;
+	nvinfer1::ICudaEngine* clip_engine;
 };
 
 };
 
 struct WorkerManager {
-	WorkerManager(CUcontext cuda_context, usize num_workers) :
+	WorkerManager(
+		CUcontext cuda_context,
+		nvinfer1::ICudaEngine* transnet_engine,
+		nvinfer1::ICudaEngine* clip_engine,
+		usize num_workers
+		) :
 		running(true),
 		num_workers(num_workers)
 	{
 		for (usize i(0); i != num_workers; ++i) {
-			workers.emplace_back(cuda_context, i, std::addressof(finished_works), std::addressof(finished_works_mutex), std::addressof(free_workers), std::addressof(free_workers_mutex));
+			workers.emplace_back(cuda_context, transnet_engine, clip_engine, i, std::addressof(finished_works), std::addressof(finished_works_mutex), std::addressof(free_workers), std::addressof(free_workers_mutex));
 		}
 	}
 

@@ -12,6 +12,7 @@ void run_transnet(
 	u8 const* const in_frames, // (900, 3, H, W) of u8 original resolution
 	u32 width, // =224
 	u32 height, // =224
+	u32 num_frames,
 	CUstream stream
 );
 

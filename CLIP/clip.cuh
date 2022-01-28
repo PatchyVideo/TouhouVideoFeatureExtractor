@@ -4,6 +4,10 @@
 #include "../wrappers/CUDADeviceMemory.h"
 #include <NvInfer.h>
 
+constexpr u32 CLIP_FEATURE_SIZE = 640;
+constexpr u32 CLIP_WIDTH = 288;
+constexpr u32 CLIP_HEIGHT = 288;
+
 void run_clip(
 	nvinfer1::IExecutionContext* clip_trt_ctx,
 	CUDADeviceMemoryUnique<f32>& out_features,
