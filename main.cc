@@ -219,6 +219,7 @@ int main(int argc, char **argv)
             write_tlv(TLVTags::FeatureContent, reinterpret_cast<std::byte const* const>(finished_batch.features), finished_batch.features_stride * finished_batch.num_results);
             finished_batch.ConsumeResponse();
         }
+        workers.Tick();
     }
     std::cout << std::endl;
     auto end(std::chrono::high_resolution_clock::now());

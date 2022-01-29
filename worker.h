@@ -209,20 +209,26 @@ struct WorkerManager {
 	}
 
 	void SubmitWork(WorkRequest req) {
+		queued_requests.push(req);
+	}
+
+	void Tick() {
+		if (queued_requests.size() == 0)
+			return;
+		std::lock_guard<std::mutex> guard(free_workers_mutex);
 		usize worker_id(0);
-		while (running) {
-			std::lock_guard<std::mutex> guard(free_workers_mutex);
-			if (free_workers.size() == 0) {
-				using namespace std::chrono_literals;
-				std::this_thread::sleep_for(10ms);
-				continue;
-			}
-			worker_id = free_workers.back();
-			free_workers.pop_back();
-			break;
+		if (free_workers.size() == 0) {
+			return;
 		}
+		worker_id = free_workers.back();
+		free_workers.pop_back();
+		
+		auto const& req(queued_requests.front());
+		queued_requests.pop();
+
 		workers[worker_id]->Submit(req);
 	}
+
 	std::optional<WorkResponse> PollResponse() {
 		std::lock_guard<std::mutex> guard(finished_works_mutex);
 		if (finished_works.size()) {
@@ -250,6 +256,8 @@ struct WorkerManager {
 
 	usize num_workers;
 	std::vector<worker_details::Worker *> workers;
+
+	std::queue<WorkRequest> queued_requests;
 
 	std::queue<WorkResponse> finished_works;
 	std::mutex finished_works_mutex;
