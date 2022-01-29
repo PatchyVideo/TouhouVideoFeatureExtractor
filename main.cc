@@ -58,7 +58,7 @@ struct VideoProvider {
         std::string video_id;
         std::string filepath;
         try {
-            scan(*file, video_id, filepath);
+            scan(*file, fast_io::mnp::line_get(video_id), fast_io::mnp::line_get(filepath));
         }
         catch (...) {
             return {};
