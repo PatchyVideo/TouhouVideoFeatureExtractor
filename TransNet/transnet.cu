@@ -10,16 +10,6 @@ union load_store_4f32
 	f32 f32s[4];
 };
 
-union load_20f32
-{
-	f32 fp32s[20];
-};
-
-union store_10f32
-{
-	f32 fp32s[10];
-};
-
 __global__ void create_padding_kernel2(
 	f32 *inout_frames, // 950 frames of 3x27x48(CHW) frames
 	usize frame_stride // 48*27*3=3888
@@ -51,7 +41,7 @@ __global__ void create_padding_kernel(
 	u32 frame_stride, // 48*27*3=3888
 	u32 num_frames
 ) {
-	i32 ix(blockIdx.x * blockDim.x + threadIdx.x), iy(blockIdx.y * blockDim.y + threadIdx.y), iz(blockIdx.z * blockDim.z + threadIdx.z);
+	i32 ix(blockIdx.x * blockDim.x + threadIdx.x), iy(blockIdx.y * blockDim.y + threadIdx.y), iz(blockIdx.z);
 	f32* src_frame, * dst_frame;
 	if (iz < 1) {
 		// head
@@ -117,16 +107,11 @@ __global__ void extract_score_kernel(
 	f32* out_scores, // (950, ) of f32 after softmax
 	f32 const* const in_softmax_output // (950, 2) of 32
 ) {
-	// 95 threads each handles 10 loads and stores
+	// 950 threads
 	i32 ix(blockIdx.x * blockDim.x + threadIdx.x);
-	if (ix >= 95)
+	if (ix >= 950)
 		return;
-	load_20f32 const* const in_20f32(reinterpret_cast<load_20f32 const* const>(in_softmax_output));
-	store_10f32* out_10fp32(reinterpret_cast<store_10f32*>(out_scores));
-#pragma unroll
-	for (u32 i(0); i < 10; ++i) {
-		(out_10fp32 + ix)->fp32s[i] = (in_20f32 + ix)->fp32s[i * 2 + 1];
-	}
+	out_scores[ix] = in_softmax_output[ix * 2 + 1];
 }
 
 void run_transnet(
@@ -140,22 +125,17 @@ void run_transnet(
 	u32 num_frames,
 	CUstream stream
 ) {
-	if (scratch_f32_1.size() < 950 * 27 * 48)
-		scratch_f32_1.reallocate(950 * 27 * 48);
+	if (scratch_f32_1.size() < 950 * 3 * 27 * 48)
+		scratch_f32_1.reallocate(950 * 3 * 27 * 48);
 	if (scratch_f32_2.size() < 950 * 2)
 		scratch_f32_2.reallocate(950 * 2);
 	// resize to scratch_f32+25frames
 	downsample_nn_and_to_fp32_1C(scratch_f32_1.at_offset(27 * 48 * 3, 25), 48, 27, in_frames, width, height, num_frames * 3, stream);
 
-	// pad 25 frames to head and tail
-	//dim3 block_padding(48 * 27 * 3 / 4, 1, 1);
-	//dim3 grid_padding(1, 1, 10);
-	//create_padding_kernel<<<grid_padding, block_padding, 0, stream>>>(reinterpret_cast<f32*>(scratch_f32_1.ptr), 48 * 27 * 3);
-	//ck2(cudaGetLastError());
 
 	// pad 25 frames to head and tail
 	dim3 block_padding(32, 32, 1);
-	dim3 grid_padding(2, 1, 2);
+	dim3 grid_padding(2, 1, 1);
 	create_padding_kernel<<<grid_padding, block_padding, 0, stream>>>(reinterpret_cast<f32*>(scratch_f32_1.ptr), 48 * 27 * 3, num_frames);
 	ck2(cudaGetLastError());
 
@@ -170,7 +150,7 @@ void run_transnet(
 	}
 
 	// extract score
-	dim3 block_score(128, 1, 1);
+	dim3 block_score(1024, 1, 1);
 	dim3 grid_score(1, 1, 1);
 	extract_score_kernel<<<grid_score, block_score, 0, stream>>>(out_scores, scratch_f32_2.at_offset(0, 0));
 	ck2(cudaGetLastError());
