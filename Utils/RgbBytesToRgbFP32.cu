@@ -59,21 +59,21 @@ __global__ void RgbBytesToRgbFp32_kernel(
 #pragma unroll
 		for (int j(0); j < 4; ++j)
 		{
-			out.fp32s[j] = static_cast<float>(r.u8s[j]) / 127.5f - 1.0f;
+			out.fp32s[j] = static_cast<float>(r.u8s[j]) / 255.0f;
 		}
 		write_pixel(out_4fp32s, iz, ix, iy * 4 + i, 0, out, reduced_frame_width, height);
 		auto g(read_pixel(in_4bytes, iz, ix, iy * 4 + i, 1, reduced_frame_width, height));
 #pragma unroll
 		for (int j(0); j < 4; ++j)
 		{
-			out.fp32s[j] = static_cast<float>(g.u8s[j]) / 127.5f - 1.0f;
+			out.fp32s[j] = static_cast<float>(g.u8s[j]) / 255.0f;
 		}
 		write_pixel(out_4fp32s, iz, ix, iy * 4 + i, 1, out, reduced_frame_width, height);
 		auto b(read_pixel(in_4bytes, iz, ix, iy * 4 + i, 2, reduced_frame_width, height));
 #pragma unroll
 		for (int j(0); j < 4; ++j)
 		{
-			out.fp32s[j] = static_cast<float>(b.u8s[j]) / 127.5f - 1.0f;
+			out.fp32s[j] = static_cast<float>(b.u8s[j]) / 255.0f;
 		}
 		write_pixel(out_4fp32s, iz, ix, iy * 4 + i, 2, out, reduced_frame_width, height);
 	}
