@@ -17,6 +17,8 @@ namespace worker_details {
 }
 
 struct WorkResponse {
+	bool end_of_video;
+	usize num_frames;
 	usize num_results;
 	u8 const* const features;
 	usize features_stride;
@@ -29,6 +31,8 @@ struct WorkResponse {
 
 	WorkResponse(
 		worker_details::Worker* self,
+		bool end_of_video,
+		usize num_frames,
 		usize num_results,
 		u8 const* const features,
 		usize features_stride,
@@ -36,6 +40,8 @@ struct WorkResponse {
 		usize frame_indices_stride,
 		usize custom_data
 	) :
+		end_of_video(end_of_video),
+		num_frames(num_frames),
 		num_results(num_results),
 		features(features),
 		features_stride(features_stride),
@@ -89,48 +95,9 @@ struct Worker {
 
 	Worker(Worker const& a) = delete;
 	Worker& operator=(Worker const& a) = delete;
-	Worker(Worker&& other) noexcept :
-		transnet_engine(other.transnet_engine),
-		clip_engine(other.clip_engine),
-		worker_id(other.worker_id),
-		finished_works(other.finished_works),
-		finished_works_mutex(other.finished_works_mutex),
-		free_workers(other.free_workers),
-		free_workers_mutex(other.free_workers_mutex),
-		submitted_job(std::move(other.submitted_job)),
-		submitted_job_mutex(std::move(other.submitted_job_mutex)),
-		submitted_job_cv(std::move(other.submitted_job_cv)),
-		thread(std::move(other.thread)),
-		doing_work(other.doing_work),
-		running(other.running)
-	{
-		other.submitted_job_mutex = nullptr;
-		other.submitted_job_cv = nullptr;
-		other.doing_work = false;
-		other.running = false;
-	}
-	Worker& operator=(Worker&& other) noexcept
-	{
-		if (std::addressof(other) != this)
-		{
-			transnet_engine = other.transnet_engine;
-			clip_engine = other.clip_engine;
-			worker_id = other.worker_id;
-			finished_works = other.finished_works;
-			finished_works_mutex = other.finished_works_mutex;
-			free_workers = other.free_workers;
-			free_workers_mutex = other.free_workers_mutex;
-			submitted_job = std::move(submitted_job);
-			submitted_job_mutex = other.submitted_job_mutex;
-			other.submitted_job_mutex = nullptr;
-			submitted_job_cv = other.submitted_job_cv;
-			other.submitted_job_cv = nullptr;
-			thread = std::move(other.thread);
-			doing_work = other.doing_work;
-			running = other.running;
-		}
-		return *this;
-	}
+	Worker(Worker&& other) = delete;
+	Worker& operator=(Worker&& other) = delete;
+
 	~Worker() noexcept {
 		try {
 			if (submitted_job_mutex) {
@@ -212,7 +179,7 @@ struct WorkerManager {
 		num_workers(num_workers)
 	{
 		for (usize i(0); i != num_workers; ++i) {
-			workers.emplace_back(cuda_context, transnet_engine, clip_engine, i, std::addressof(finished_works), std::addressof(finished_works_mutex), std::addressof(free_workers), std::addressof(free_workers_mutex));
+			workers.emplace_back(new worker_details::Worker(cuda_context, transnet_engine, clip_engine, i, std::addressof(finished_works), std::addressof(finished_works_mutex), std::addressof(free_workers), std::addressof(free_workers_mutex)));
 			free_workers.push_back(i);
 		}
 	}
@@ -227,6 +194,13 @@ struct WorkerManager {
 			if (running) {
 				Stop();
 				Join();
+				for (auto& worker : workers) {
+					if (worker) {
+						delete worker;
+						worker = nullptr;
+					}
+				}
+				workers.clear();
 			}
 		}
 		catch (...) {
@@ -247,7 +221,7 @@ struct WorkerManager {
 			free_workers.pop_back();
 			break;
 		}
-		workers[worker_id].Submit(req);
+		workers[worker_id]->Submit(req);
 	}
 	std::optional<WorkResponse> PollResponse() {
 		std::lock_guard<std::mutex> guard(finished_works_mutex);
@@ -264,18 +238,18 @@ struct WorkerManager {
 	void Stop() {
 		running = false;
 		for (auto& worker : workers)
-			worker.running = false;
+			worker->running = false;
 	}
 
 	void Join() {
 		for (auto& worker : workers)
-			worker.Join();
+			worker->Join();
 	}
 
 	bool running;
 
 	usize num_workers;
-	std::vector<worker_details::Worker> workers;
+	std::vector<worker_details::Worker *> workers;
 
 	std::queue<WorkResponse> finished_works;
 	std::mutex finished_works_mutex;

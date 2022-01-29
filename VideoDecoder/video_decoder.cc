@@ -211,7 +211,6 @@ void video_deocder_thread(CUcontext cuda_context, VideoDecoderSyncState *states)
 			nFrameReturned = dec.Decode(pVideo, nVideoBytes);
 			if (nFrameReturned > max_frames_returned)
 			{
-				std::cout << "max_frames_returned:" << nFrameReturned << "\n";
 				if (ppFrame)
 					ppFrame = static_cast<u8**>(realloc(ppFrame, nFrameReturned * sizeof(u8*)));
 				else

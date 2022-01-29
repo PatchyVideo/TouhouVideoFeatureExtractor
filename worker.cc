@@ -7,12 +7,16 @@
 
 namespace worker_details {
 
+std::mutex create_context_mutex;
+
 void worker_thread(CUcontext cuda_context, Worker* self) {
 	CUDAThreadContext cuda_thread_ctx(cuda_context);
 	CUDAStream stream;
 
+	std::unique_lock<std::mutex> ctx_creation_guard(create_context_mutex);
 	nvinfer1::IExecutionContext *transnet_ctx(self->transnet_engine->createExecutionContext());
 	nvinfer1::IExecutionContext* clip_ctx(self->clip_engine->createExecutionContext());
+	ctx_creation_guard.unlock();
 
 	assert(transnet_ctx->setOptimizationProfile(0));
 	assert(clip_ctx->setOptimizationProfile(0));
@@ -114,6 +118,8 @@ void worker_thread(CUcontext cuda_context, Worker* self) {
 		self->SubmitResponse(
 			WorkResponse(
 				self,
+				fb.end_of_video,
+				fb.number_of_frames,
 				num_features,
 				reinterpret_cast<u8 const* const>(clip_features_cpu.at_offset(0, 0)),
 				sizeof(f32) * CLIP_FEATURE_SIZE,

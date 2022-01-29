@@ -88,7 +88,6 @@ struct VideoDecoderSyncState {
 			memory_block_states.push_back(VideoDecoderMemoryBlockState::Ready);
 			free_memory_blocks.push_back(i);
 		}
-		video_info.reserve(video_deocder_details::VIDEO_DECODER_DEFAULT_QUEUE_SIZE);
 	}
 
 	VideoDecoderSyncState(VideoDecoderSyncState const& a) = delete;
@@ -163,23 +162,14 @@ struct VideoDecoderSyncState {
 	void PushVideoInformation(usize id, BasicVideoInformation info) {
 		std::lock_guard<std::mutex> guard(video_info_mutex);
 		info.video_id = id;
-		video_info.push_back(info);
-	}
-
-	std::optional<BasicVideoInformation> PopVideoInformation(usize id) {
-		std::lock_guard<std::mutex> guard(video_info_mutex);
-		for (auto const& info : video_info) {
-			if (info.video_id == id)
-				return { info };
-		}
-		return {};
+		video_info.push(info);
 	}
 
 	std::optional<BasicVideoInformation> PopVideoInformation() {
 		std::lock_guard<std::mutex> guard(video_info_mutex);
 		if (video_info.size()) {
-			auto ret(video_info.back());
-			video_info.pop_back();
+			auto ret(video_info.front());
+			video_info.pop();
 			return { ret };
 		}
 		return {};
@@ -221,7 +211,7 @@ private:
 	std::mutex memory_block_mutex;
 	std::condition_variable memory_block_cv;
 
-	std::vector<BasicVideoInformation> video_info;
+	std::queue<BasicVideoInformation> video_info;
 	std::mutex video_info_mutex;
 
 	std::queue<VideoDecoderErrorReport> error_reports;
@@ -276,17 +266,6 @@ struct VideoDecoder {
 		if (!m_sync_states.running)
 			return;
 		m_sync_states.EnqueueFile(video_filename, unique_video_id);
-	}
-
-	/**
-	*   @brief  Returns the basic information of a video enqueued
-	*   @param  id - Video ID
-	*   @return The video's info if the video is being processed
-	*/
-	std::optional<BasicVideoInformation> GetVideoInformation(usize id) {
-		if (!m_sync_states.running)
-			return {};
-		return m_sync_states.PopVideoInformation(id);
 	}
 
 	/**

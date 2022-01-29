@@ -1,5 +1,6 @@
 
 #include <iostream>
+#include <string>
 
 #include "fast_io/fast_io.h"
 #include "fast_io/fast_io_device.h"
@@ -33,22 +34,49 @@ class Logger : public nvinfer1::ILogger
     {
         // suppress info-level messages
         //if (severity != Severity::kINFO)
-        std::cout << msg << std::endl;
+        //    std::cout << msg << std::endl;
     }
 } g_trtLogger;
 
 struct VideoProvider {
-    VideoProvider(char const* filelist) {
+    fast_io::ibuf_file* file;
 
+    VideoProvider(VideoProvider const& a) = delete;
+    VideoProvider& operator=(VideoProvider const& a) = delete;
+    VideoProvider(VideoProvider&& a) = delete;
+    VideoProvider& operator=(VideoProvider&& a) = delete;
+
+    VideoProvider(std::string_view filelist) : file(nullptr) {
+        file = new fast_io::ibuf_file(filelist);
     }
 
-    std::optional<std::string> TryFetchNextVideo() {
-        return {};
+    ~VideoProvider() noexcept {
+        delete file;
+    }
+
+    std::optional<std::tuple<std::string, std::string>> TryFetchNextVideo() {
+        std::string video_id;
+        std::string filepath;
+        try {
+            scan(*file, video_id, filepath);
+        }
+        catch (...) {
+            return {};
+        }
+        return { { video_id , filepath } };
     }
 };
 
+enum class TLVTags: u8 {
+    VideoId = 0, //av or BV
+    BasicInfo = 1,
+    FeatureIndices = 2,
+    FeatureContent = 3,
+    ErrorInd = 4
+};
+
 struct ReorderBuffer {
-    void Reserve(usize pos, usize size) {
+    usize Reserve(usize size) {
 
     }
     template<
@@ -77,126 +105,128 @@ nvinfer1::ICudaEngine* LoadEngineFromFile(std::string_view filename, nvinfer1::I
     return nullptr;
 }
 
-int main()
+int main(int argc, char **argv)
 {
-    //char const* hello = "Hello";
-    //fast_io::obuf_file obf(fast_io::mnp::os_c_str("1.txt"));
-    //fast_io::write(obf, hello, hello + 2);
-    //print("Hello\n");
-    //return 0;
+    if (argc != 3) {
+        perrln("Usage: ", fast_io::mnp::os_c_str(argv[0]), " <saved-feature-file> <video-list-file>");
+        return 1;
+    }
     ck2(cuInit(0));
     constexpr u32 WIDTH = 288;
     constexpr u32 HEIGHT = 288;
     constexpr usize FRAME_STRIDE = WIDTH * HEIGHT * 3;
 
     CUDAContext context(0, 0);
+    VideoProvider video_provider(argv[2]);
+    fast_io::obuf_file obf(fast_io::mnp::os_c_str(argv[1]));
+    println(" -- Saving to ", fast_io::mnp::os_c_str(argv[1]));
+    println(" -- Sourcing videos from ", fast_io::mnp::os_c_str(argv[2]));
 
     NvInferRuntime trt_runtime(g_trtLogger);
+    println(" -- Loading TensorRT engines");
+    fast_io::flush(fast_io::c_stdout());
     nvinfer1::ICudaEngine* transnet_engine(LoadEngineFromFile("models/transnet.trt", trt_runtime.runtime));
     nvinfer1::ICudaEngine* clip_engine(LoadEngineFromFile("models/RN50x4.trt", trt_runtime.runtime));
 
     WorkerManager workers(context, transnet_engine, clip_engine, 1);
 
-    robin_hood::unordered_set<usize> ongoing_videos;
-
     VideoDecoder decoder(context, 5, 900, WIDTH, HEIGHT);
-    //decoder.EnqueueDecode("..\\test_videos\\mokou_remi.mp4", 123);
-    //decoder.EnqueueDecode("..\\test_videos\\2.mp4", 124);
-    decoder.EnqueueDecode("..\\test_videos\\1.flv", 125);
     usize finished_videos(0);
+    usize pending_videos(0);
+
+    usize videoid_ctr(0);
 
     robin_hood::unordered_flat_map<usize, BasicVideoInformation> video_infos;
 
     FPSCounter fps;
     auto start(std::chrono::high_resolution_clock::now());
-    bool first(true);
+    bool first(true), finished(false);
+
+    std::byte tmp_length[4];
+    auto put_length = [&tmp_length](u32 len) -> void {
+        tmp_length[0] = static_cast<std::byte>((len >> 24) & 0xFF);
+        tmp_length[1] = static_cast<std::byte>((len >> 16) & 0xFF);
+        tmp_length[2] = static_cast<std::byte>((len >> 8) & 0xFF);
+        tmp_length[3] = static_cast<std::byte>((len >> 0) & 0xFF);
+    };
+    auto write_tlv = [&obf, &put_length, &tmp_length](TLVTags tag, std::byte const* const data, u32 length) -> void {
+        fast_io::put(obf, static_cast<u8>(tag));
+        put_length(length);
+        fast_io::write(obf, tmp_length, tmp_length + 4);
+        fast_io::write(obf, data, data + length);
+    };
 
     usize num_frames(0);
-    for (; finished_videos < 1;) {
+    usize num_features(0);
+
+    println(" -- Processing videos");
+    fast_io::flush(fast_io::c_stdout());
+    while (finished_videos < pending_videos || first) {
+        first = false;
+        while (decoder.VideoEnqueueRecommended() && !finished) {
+            auto const& next_video(video_provider.TryFetchNextVideo());
+            if (next_video.has_value()) {
+                auto const& [video_id, video_path] = *next_video;
+                decoder.EnqueueDecode(video_path, videoid_ctr++);
+                ++pending_videos;
+                // put video ID
+                write_tlv(TLVTags::VideoId, reinterpret_cast<std::byte const* const>(video_id.data()), video_id.size());
+            }
+            else {
+                finished = true;
+            }
+        }
         {
             // prevent starvation
             using namespace std::chrono_literals;
-            std::this_thread::sleep_for(10ms);
+            std::this_thread::sleep_for(1ms);
         }
         auto info_opt(decoder.GetVideoInformation());
         if (info_opt.has_value()) {
             auto const& info(*info_opt);
-            std::cout << "====Video Info====\n";
-            std::cout << "Video ID: " << info.video_id << "\n";
-            std::cout << "Width: " << info.width << "\n";
-            std::cout << "Height: " << info.height << "\n";
-            std::cout << "FPS: " << info.frame_per_second << "\n";
-            std::cout << "Frame count: " << info.frame_count << "\n";
-            std::cout << "Duration: " << info.duration_us << "\n";
-            std::cout << "==================\n";
+            // put basic info
+            write_tlv(TLVTags::BasicInfo, reinterpret_cast<std::byte const* const>(std::addressof(info)), sizeof(BasicVideoInformation));
         }
         auto error_report_opt(decoder.PollErrorReport());
         if (error_report_opt.has_value()) {
             auto& error_report(*error_report_opt);
-            std::cout << "Video " << error_report.video_id << " Error: " << error_report.message << "\n";
+            std::cerr << "Video " << error_report.video_id << " Error: " << error_report.message << "\n";
+            // put error report
+            write_tlv(TLVTags::ErrorInd, reinterpret_cast<std::byte const* const>(error_report.message.data()), error_report.message.size());
             ++finished_videos;
         }
         auto frame_batch_opt(decoder.PollNextBatch());
         if (frame_batch_opt.has_value()) {
             auto& frame_batch(*frame_batch_opt);
-            //std::cout << "====Frame Batch====\n";
-            //std::cout << "Offset: " << frame_batch.frame_offset << "\n";
-            //std::cout << "#Frame: " << frame_batch.number_of_frames << "\n";
-            //std::cout << "EOS: " << frame_batch.end_of_video << "\n";
-            //std::cout << "m_memory_block_id: " << frame_batch.m_memory_block_id << "\n";
-            //std::cout << "===================\n";
             num_frames += frame_batch.number_of_frames;
-            if (first) {
-                first = false;
-                usize frame_idx(frame_batch.number_of_frames - 1);
-                u8* frame_chw_gpu(frame_batch.frames_gpu + FRAME_STRIDE * frame_idx);
-                std::vector<u8> frame_chw(FRAME_STRIDE);
-                std::vector<u8> frame_hwc(WIDTH * HEIGHT * 4);
-                cuMemcpyDtoH(frame_chw.data(), (CUdeviceptr)frame_chw_gpu, WIDTH * HEIGHT * 3);
-                for (usize i(0); i != HEIGHT; ++i) {
-                    for (usize j(0); j != WIDTH; ++j) {
-                        u8* dst(frame_hwc.data() + (i * WIDTH + j) * 4);
-                        u8* src_r(frame_chw.data() + (WIDTH * HEIGHT) * 0 + i * WIDTH + j);
-                        u8* src_g(frame_chw.data() + (WIDTH * HEIGHT) * 1 + i * WIDTH + j);
-                        u8* src_b(frame_chw.data() + (WIDTH * HEIGHT) * 2 + i * WIDTH + j);
-                        dst[0] = *src_r;
-                        dst[1] = *src_g;
-                        dst[2] = *src_b;
-                        dst[3] = 255;
-                    }
-                }
-                lodepng::encode("..\\test_videos\\1.flv.png", frame_hwc, WIDTH, HEIGHT);
-                WorkRequest req{ .frames = frame_batch, .custom_data = 0 };
-                workers.SubmitWork(req);
-                for (;;) {
-                    auto r(workers.PollResponse());
-                    if (r.has_value()) {
-                        auto& r2(*r);
-                        std::cout << "n_feats: " << r2.num_results << "\n";
-                        r2.ConsumeResponse();
-                        break;
-                    }
-                }
-            }
-            if (fps.Update(frame_batch.number_of_frames)) {
-                std::cout << "FPS: " << fps.GetFPS() << "\n";
-            }
-            using namespace std::chrono_literals;
-            //std::this_thread::sleep_for(2000ms);
-            frame_batch.ConsumeBatch();
-            if (frame_batch.end_of_video) {
+            WorkRequest req{ .frames = frame_batch, .custom_data = 0 };
+            workers.SubmitWork(req);
+        }
+        auto finished_batch_opt(workers.PollResponse());
+        if (finished_batch_opt) {
+            auto& finished_batch(*finished_batch_opt);
+            if (finished_batch.end_of_video) {
                 ++finished_videos;
             }
+            num_features += finished_batch.num_results;
+            if (fps.Update(finished_batch.num_frames) || finished_batch.end_of_video) {
+                print("FPS: ", fps.GetFPS(), " #Videos: ", finished_videos, " #Frames: ", num_frames, " #Features: ", num_features, "               \r");
+                fast_io::flush(fast_io::c_stdout());
+            }
+            // put indices
+            write_tlv(TLVTags::FeatureIndices, reinterpret_cast<std::byte const* const>(finished_batch.frame_indices), finished_batch.frame_indices_stride * finished_batch.num_results);
+            // put features
+            write_tlv(TLVTags::FeatureContent, reinterpret_cast<std::byte const* const>(finished_batch.features), finished_batch.features_stride * finished_batch.num_results);
+            finished_batch.ConsumeResponse();
         }
     }
-    std::cout << "End\n";
-    std::cout << "frames decoded: " << num_frames << "\n";
+    std::cout << std::endl;
     auto end(std::chrono::high_resolution_clock::now());
-    auto elpased(std::chrono::duration_cast<std::chrono::milliseconds>(end - start));
-    std::cout << "Total " << elpased.count() << " ms\n";
-
-    delete transnet_engine;
-    delete clip_engine;
+    auto elpased(std::chrono::duration_cast<std::chrono::seconds>(end - start));
+    println(" -- Done processing videos");
+    println(" -- Frames decoded: ", num_frames, " features extracted: ", num_features);
+    println(" -- Total ", elpased.count(), " seconds");
+    fast_io::flush(fast_io::c_stdout());
 
     return 0;
 }
