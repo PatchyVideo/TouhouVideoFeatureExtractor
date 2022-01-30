@@ -190,7 +190,8 @@ int main(int argc, char **argv)
         auto error_report_opt(decoder.PollErrorReport());
         if (error_report_opt.has_value()) {
             auto& error_report(*error_report_opt);
-            std::cerr << "Video " << error_report.video_id << " Error: " << error_report.message << "\n";
+            perrln("Video ", error_report.video_id, " Error: ", error_report.message);
+            fast_io::flush(fast_io::c_stderr());
             // put error report
             write_tlv(TLVTags::ErrorInd, reinterpret_cast<std::byte const* const>(error_report.message.data()), error_report.message.size());
             ++finished_videos;
