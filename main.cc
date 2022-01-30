@@ -156,6 +156,8 @@ int main(int argc, char **argv)
         fast_io::write(obf, data, data + length);
     };
 
+    std::queue<std::string> video_ids;
+
     usize num_frames(0);
     usize num_features(0);
 
@@ -168,9 +170,8 @@ int main(int argc, char **argv)
             if (next_video.has_value()) {
                 auto const& [video_id, video_path] = *next_video;
                 decoder.EnqueueDecode(video_path, videoid_ctr++);
+                video_ids.push(video_id);
                 ++pending_videos;
-                // put video ID
-                write_tlv(TLVTags::VideoId, reinterpret_cast<std::byte const* const>(video_id.data()), video_id.size());
             }
             else {
                 finished = true;
@@ -184,6 +185,10 @@ int main(int argc, char **argv)
         auto info_opt(decoder.GetVideoInformation());
         if (info_opt.has_value()) {
             auto const& info(*info_opt);
+            auto video_id(video_ids.front());
+            video_ids.pop();
+            // put video ID
+            write_tlv(TLVTags::VideoId, reinterpret_cast<std::byte const* const>(video_id.data()), video_id.size());
             // put basic info
             write_tlv(TLVTags::BasicInfo, reinterpret_cast<std::byte const* const>(std::addressof(info)), sizeof(BasicVideoInformation));
         }
