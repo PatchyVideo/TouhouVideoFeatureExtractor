@@ -54,6 +54,16 @@ struct VideoProvider {
         delete file;
     }
 
+    std::string clean_line_string(std::string line)
+    {
+        size_t n = line.find_last_not_of(" \r\n\t");
+        if (n != std::string::npos) {
+            line.erase(n + 1, line.size() - n);
+        }
+
+        return line;
+    }
+
     std::optional<std::tuple<std::string, std::string>> TryFetchNextVideo() {
         std::string video_id;
         std::string filepath;
@@ -63,11 +73,11 @@ struct VideoProvider {
         catch (...) {
             return {};
         }
-        return { { video_id , filepath } };
+        return { { clean_line_string(video_id) , clean_line_string(filepath) } };
     }
 };
 
-enum class TLVTags: u8 {
+enum class TLVTags : u8 {
     VideoId = 0, //av or BV
     BasicInfo = 1,
     FeatureIndices = 2,
@@ -85,7 +95,7 @@ struct ReorderBuffer {
         typename decorators,
         std::size_t bfs, ::fast_io::freestanding::random_access_iterator Iter
     > requires (((mde& fast_io::buffer_mode::out) == fast_io::buffer_mode::out) && fast_io::details::allow_iobuf_punning<typename decorators::internal_type, Iter>)
-    bool Complete(usize pos, fast_io::basic_io_buffer<handletype, mde, decorators, bfs>& bios, u8 const* const data) {
+        bool Complete(usize pos, fast_io::basic_io_buffer<handletype, mde, decorators, bfs>& bios, u8 const* const data) {
 
     }
 };
@@ -105,7 +115,7 @@ nvinfer1::ICudaEngine* LoadEngineFromFile(std::string_view filename, nvinfer1::I
     return nullptr;
 }
 
-int main(int argc, char **argv)
+int main(int argc, char** argv)
 {
     if (argc != 3) {
         perrln("Usage: ", fast_io::mnp::os_c_str(argv[0]), " <saved-feature-file> <video-list-file>");
