@@ -19,7 +19,7 @@ namespace fast_io
 template<typename T>
 concept type_has_c_str_method = requires(T&& t)
 {
-	{t.c_str()}->::fast_io::details::c_str_pointer;
+	{t.c_str()}->fast_io::details::c_str_pointer;
 };
 
 template<typename T>
